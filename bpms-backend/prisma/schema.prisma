@@ -1,0 +1,283 @@
+// Prisma schema for BPMS MVP
+// Using SQLite for development persistence
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users & Roles
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdProcesses   Process[]           @relation("ProcessCreatedBy")
+  instancesStarted   ProcessInstance[]   @relation("InstanceStartedBy")
+  assignedTasks      Task[]              @relation("TaskAssignee")
+  assignments        TaskAssignment[]    @relation("AssignmentAssignee")
+  formSubmissions    FormSubmission[]    @relation("SubmissionSubmittedBy")
+  userPositions      UserPosition[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Departments & Positions
+// ---------------------------------------------------------------------------
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  positions Position[]
+
+  @@map("departments")
+}
+
+model Position {
+  id           String   @id @default(uuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userPositions  UserPosition[]
+  taskAssignments TaskAssignment[]
+  tasks           Task[]
+
+  @@unique([departmentId, name])
+  @@map("positions")
+}
+
+// Many-to-many: a user can hold multiple positions across departments
+model UserPosition {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, positionId])
+  @@map("user_positions")
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Forms
+// ---------------------------------------------------------------------------
+
+model Form {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  // Each form belongs to one process. Nullable in DB for legacy rows; API requires processId.
+  processId   String?
+  process     Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
+  // JSON Schema describing form fields. Stored as TEXT (JSON string) in SQLite.
+  fields     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  assignments     TaskAssignment[]
+  tasks           Task[]
+  submissions     FormSubmission[]
+
+  @@map("forms")
+}
+
+// ---------------------------------------------------------------------------
+// Process Definitions (BPMN)
+// ---------------------------------------------------------------------------
+
+enum ProcessStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Process {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  bpmnXml     String
+  version     Int           @default(1)
+  status      ProcessStatus @default(DRAFT)
+  createdById String
+  createdBy   User          @relation("ProcessCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  instances   ProcessInstance[]
+  assignments TaskAssignment[]
+  forms       Form[]
+  variables   ProcessVariable[]
+
+  @@map("processes")
+}
+
+// Process-scoped variables — defined at process level, bound to form fields
+model ProcessVariable {
+  id        String   @id @default(uuid())
+  processId String
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  name      String
+  label     String?
+  type      String   @default("text")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([processId, name])
+  @@map("process_variables")
+}
+
+// ---------------------------------------------------------------------------
+// Process Instances (runtime)
+// ---------------------------------------------------------------------------
+
+enum InstanceStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  TERMINATED
+}
+
+model ProcessInstance {
+  id         String         @id @default(uuid())
+  processId  String
+  process    Process        @relation(fields: [processId], references: [id])
+  status     InstanceStatus @default(RUNNING)
+  startedById String
+  startedBy  User           @relation("InstanceStartedBy", fields: [startedById], references: [id])
+  startedAt  DateTime       @default(now())
+  completedAt DateTime?
+  // Snapshot of the BPMN XML used to execute this instance
+  bpmnXmlSnapshot String
+  // Current state of the bpmn-engine (JSON serialized listener state for resume)
+  engineState String?
+  // Last error message if status=FAILED
+  lastError  String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  tasks      Task[]
+
+  @@map("process_instances")
+}
+
+// ---------------------------------------------------------------------------
+// Task assignments — pre-bind each BPMN user task (by name) to a user OR position + form
+// ---------------------------------------------------------------------------
+
+model TaskAssignment {
+  id         String  @id @default(uuid())
+  processId  String
+  process    Process @relation(fields: [processId], references: [id], onDelete: Cascade)
+  // Name of the userTask in the BPMN XML (e.g. "Approve Request")
+  taskName   String
+  // Optional: assigned user (if null AND positionId is null, anyone can claim)
+  assigneeId String?
+  assignee   User?   @relation("AssignmentAssignee", fields: [assigneeId], references: [id])
+  // Optional: assigned position (any user holding this position can complete the task)
+  positionId String?
+  position   Position? @relation(fields: [positionId], references: [id])
+  // Self-service mode (only relevant when positionId is set):
+  //  false (default) → any holder can complete directly (first-come-first-serve)
+  //  true             → holder must CLAIM the task before completing; claimed task
+  //                     disappears from other holders' queues
+  selfService Boolean @default(false)
+  // Optional form bound to this task
+  formId     String?
+  form       Form?   @relation(fields: [formId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([processId, taskName])
+  @@map("task_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Runtime Tasks (instances of user tasks in a running process)
+// ---------------------------------------------------------------------------
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  CANCELLED
+}
+
+model Task {
+  id                String         @id @default(uuid())
+  processInstanceId String
+  processInstance   ProcessInstance @relation(fields: [processInstanceId], references: [id], onDelete: Cascade)
+  // Name of the userTask from BPMN
+  name              String
+  // Optional human-friendly description from BPMN documentation
+  description       String?
+  // Direct assignee. For position-based tasks this is null until someone CLAIMS it,
+  // at which point it's set to the claimer's ID (and other holders can no longer see it).
+  assigneeId        String?
+  assignee          User?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  // Position-based assignment (if task was assigned to a position — any holder can complete)
+  positionId        String?
+  position          Position?      @relation(fields: [positionId], references: [id])
+  // Self-service mode (copied from TaskAssignment at creation time).
+  // If true, the task must be CLAIMED before it can be completed.
+  selfService       Boolean        @default(false)
+  formId            String?
+  form              Form?          @relation(fields: [formId], references: [id])
+  status            TaskStatus     @default(PENDING)
+  // BPMN element id from the XML (e.g. "ApproveRequest")
+  activityId        String?
+  // bpmn-engine runtime execution id — needed to signal the engine to advance.
+  // Persisted so we can recover after a server restart.
+  executionId       String?
+  createdAt         DateTime       @default(now())
+  completedAt       DateTime?
+
+  submissions       FormSubmission[]
+
+  @@map("tasks")
+}
+
+// ---------------------------------------------------------------------------
+// Form submissions — JSON data captured when a user completes a task
+// ---------------------------------------------------------------------------
+
+model FormSubmission {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  formId    String?
+  form      Form?    @relation(fields: [formId], references: [id])
+  // JSON string with submitted key/values
+  data      String
+  submittedById String
+  submittedBy User  @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt DateTime @default(now())
+
+  @@map("form_submissions")
+}

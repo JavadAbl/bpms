@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_LeaveApproval"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="LeaveApprovalProcess" name="Leave Approval" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Start">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="SubmitRequest"/>
+    <bpmn:userTask id="SubmitRequest" name="Submit Request">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:documentation>Employee submits a leave request</bpmn:documentation>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="SubmitRequest" targetRef="DecisionGateway"/>
+    <bpmn:exclusiveGateway id="DecisionGateway" name="Leave Type Decision">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_Sick</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NeedsApproval</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_Sick" sourceRef="DecisionGateway" targetRef="AutoApproveEnd">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="javascript">next(null, environment.variables.leaveType === 'Sick');</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NeedsApproval" sourceRef="DecisionGateway" targetRef="ApproveRequest">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="javascript">next(null, environment.variables.leaveType !== 'Sick');</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="ApproveRequest" name="Approve Request">
+      <bpmn:incoming>Flow_NeedsApproval</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:documentation>Manager reviews and approves/rejects the request</bpmn:documentation>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="ApproveRequest" targetRef="ApprovedEnd"/>
+    <bpmn:endEvent id="ApprovedEnd" name="Approved">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="AutoApproveEnd" name="Auto-Approved (Sick Leave)">
+      <bpmn:incoming>Flow_Sick</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>

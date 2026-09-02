@@ -1,0 +1,8 @@
+{
+  "name": "bpms-backend-mini",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node dist/main.js"
+  }
+}
