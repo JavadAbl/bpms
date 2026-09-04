@@ -5,22 +5,25 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { t } from '@/lib/i18n';
+import { OptionSelect } from '@/components/common/option-select';
+import { FileUploadField } from '@/components/common/file-upload-field';
 
 export interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'radio';
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'radio' | 'file';
   required?: boolean;
   options?: string[];
+  /** Reference to a global reusable category — overrides inline options. */
+  categoryId?: string;
   placeholder?: string;
+  /** Per-field read-only: renders disabled, pre-filled from process instance variables. */
+  readOnly?: boolean;
+  /** Process variable name used for prefill lookup (defaults to name). */
+  variable?: string;
+  /** File fields only: allow multiple attachments (value is always an array of metas). */
+  multiple?: boolean;
 }
 
 export interface DynamicFormProps {
@@ -43,6 +46,7 @@ const FIELD_TYPES: FormField['type'][] = [
   'date',
   'select',
   'checkbox',
+  'file',
 ];
 
 export function DynamicForm({
@@ -88,6 +92,7 @@ export function DynamicForm({
   return (
     <div id={id} className="grid gap-4">
       {visibleFields.map((field) => {
+        const fieldLocked = readOnly || !!field.readOnly;
         const labelText = `${field.label}${field.required ? ' *' : ''}`;
         if (field.type === 'checkbox') {
           return (
@@ -96,7 +101,7 @@ export function DynamicForm({
                 id={`field-${field.name}`}
                 checked={!!values[field.name]}
                 onCheckedChange={(v) => setField(field.name, v === true)}
-                disabled={readOnly}
+                disabled={fieldLocked}
               />
               <Label htmlFor={`field-${field.name}`}>{labelText}</Label>
             </div>
@@ -111,32 +116,23 @@ export function DynamicForm({
                 value={values[field.name] ?? ''}
                 placeholder={field.placeholder}
                 onChange={(e) => setField(field.name, e.target.value)}
-                disabled={readOnly}
+                disabled={fieldLocked}
               />
             </div>
           );
         }
         if (field.type === 'select') {
-          const opts = Array.isArray(field.options) ? field.options : [];
           return (
             <div key={field.name} className="grid gap-1.5">
               <Label htmlFor={`field-${field.name}`}>{labelText}</Label>
-              <Select
+              <OptionSelect
+                id={`field-${field.name}`}
+                categoryId={field.categoryId}
+                options={field.options}
                 value={values[field.name] ?? ''}
-                onValueChange={(v) => setField(field.name, v)}
-                disabled={readOnly || opts.length === 0}
-              >
-                <SelectTrigger id={`field-${field.name}`} className="w-full">
-                  <SelectValue placeholder={opts.length ? t.all : t.noOptions} />
-                </SelectTrigger>
-                <SelectContent>
-                  {opts.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => setField(field.name, v)}
+                disabled={fieldLocked}
+              />
             </div>
           );
         }
@@ -157,13 +153,30 @@ export function DynamicForm({
                       value={opt}
                       checked={values[field.name] === opt}
                       onChange={() => setField(field.name, opt)}
-                      disabled={readOnly}
+                      disabled={fieldLocked}
                       className="size-4"
                     />
                     {opt}
                   </label>
                 ))}
               </div>
+            </div>
+          );
+        }
+        if (field.type === 'file') {
+          const raw = values[field.name];
+          // Normalize legacy/odd shapes (single object) into the meta array
+          const fileValue = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : [];
+          return (
+            <div key={field.name} className="grid gap-1.5">
+              <Label>{labelText}</Label>
+              <FileUploadField
+                value={fileValue}
+                onChange={(v) => setField(field.name, v)}
+                multiple={!!field.multiple}
+                disabled={fieldLocked}
+                fromPreviousTask={!!field.readOnly && !readOnly}
+              />
             </div>
           );
         }
@@ -186,7 +199,7 @@ export function DynamicForm({
                     : e.target.value,
                 )
               }
-              disabled={readOnly}
+              disabled={fieldLocked}
             />
           </div>
         );
@@ -198,6 +211,8 @@ export function DynamicForm({
 /**
  * Validate a dynamic form. Returns a map of fieldName -> error message.
  * Empty object means valid.
+ * Read-only fields are skipped: they display data from previous tasks and
+ * cannot be edited by the current user, so they must never block completion.
  */
 export function validateDynamicForm(
   fields: FormField[],
@@ -205,7 +220,7 @@ export function validateDynamicForm(
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const f of fields) {
-    if (!f.required) continue;
+    if (!f.required || f.readOnly) continue;
     const v = values[f.name];
     if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) {
       errors[f.name] = t.requiredField;

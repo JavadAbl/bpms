@@ -15,6 +15,7 @@ import {
   Users,
   LogOut,
   LayoutDashboard,
+  Tags,
 } from 'lucide-react';
 import { TasksView } from '@/components/views/tasks-view';
 import { TaskDetailView } from '@/components/views/task-detail-view';
@@ -22,6 +23,7 @@ import { InstancesView } from '@/components/views/instances-view';
 import { InstanceDetailView } from '@/components/views/instance-detail-view';
 import { ProcessesView } from '@/components/views/processes-view';
 import { DepartmentsView } from '@/components/views/departments-view';
+import { CategoriesView } from '@/components/views/categories-view';
 import { UsersView } from '@/components/views/users-view';
 import { ProcessDesignerView } from '@/components/views/process-designer-view';
 
@@ -33,6 +35,7 @@ export type ViewName =
   | 'processes'
   | 'process-designer'
   | 'departments'
+  | 'categories'
   | 'users';
 
 interface AppState {
@@ -53,6 +56,7 @@ export function AppShell() {
     { key: 'instances' as ViewName, label: t.instances, icon: GitBranch, admin: false },
     { key: 'processes' as ViewName, label: t.processes, icon: Workflow, admin: true },
     { key: 'departments' as ViewName, label: t.departments, icon: Building2, admin: true },
+    { key: 'categories' as ViewName, label: t.categories, icon: Tags, admin: true },
     { key: 'users' as ViewName, label: t.users, icon: Users, admin: true },
   ];
 
@@ -98,6 +102,8 @@ export function AppShell() {
         return isAdmin ? <ProcessesView onOpenDesigner={(pid) => navigate('process-designer', undefined, undefined, pid)} /> : <NoAccess />;
       case 'departments':
         return isAdmin ? <DepartmentsView /> : <NoAccess />;
+      case 'categories':
+        return isAdmin ? <CategoriesView /> : <NoAccess />;
       case 'users':
         return isAdmin ? <UsersView /> : <NoAccess />;
       default:

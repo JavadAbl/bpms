@@ -4,7 +4,7 @@
  * This avoids CORS issues — all calls are same-origin.
  */
 
-const API_BASE = 'http://192.168.1.44:3001/api';
+const API_BASE = '/api';
 
 let token: string | null = null;
 
@@ -122,6 +122,14 @@ export const processesApi = {
       body: JSON.stringify({ assignments }),
     }),
   getVariables: (id: string) => apiFetch<any[]>(`/processes/${id}/variables`),
+  getVersions: (id: string) => apiFetch<any[]>(`/processes/${id}/versions`),
+  getVersion: (id: string, version: number) =>
+    apiFetch<any>(`/processes/${id}/versions/${version}`),
+  restoreVersion: (id: string, version: number, note?: string) =>
+    apiFetch<any>(`/processes/${id}/versions/${version}/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    }),
   setVariables: (id: string, variables: { name: string; label?: string; type?: string }[]) =>
     apiFetch(`/processes/${id}/variables`, {
       method: 'PUT',
@@ -142,6 +150,47 @@ export const formsApi = {
   update: (id: string, data: { name: string; description?: string; fields: any[]; processId: string }) =>
     apiFetch(`/forms/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) => apiFetch(`/forms/${id}`, { method: 'DELETE' }),
+};
+
+// ---------------------------------------------------------------------------
+// Categories (global reusable dropdown option lists)
+// ---------------------------------------------------------------------------
+export interface CategoryItem {
+  id: string;
+  value: string;
+  label: string;
+  sortOrder: number;
+}
+
+export interface CategoryUsage {
+  formCount: number;
+  formNames: string[];
+}
+
+export interface Category {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  items: CategoryItem[];
+  usage?: CategoryUsage;
+}
+
+export interface CategoryItemInput {
+  value: string;
+  label: string;
+}
+
+export const categoriesApi = {
+  findAll: () => apiFetch<Category[]>('/categories'),
+  findOne: (id: string) => apiFetch<Category>(`/categories/${id}`),
+  create: (data: { key: string; name: string; description?: string; items?: CategoryItemInput[] }) =>
+    apiFetch<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
+  update: (
+    id: string,
+    data: { key?: string; name?: string; description?: string; items?: CategoryItemInput[] },
+  ) => apiFetch<Category>(`/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) => apiFetch(`/categories/${id}`, { method: 'DELETE' }),
 };
 
 // ---------------------------------------------------------------------------
@@ -186,4 +235,54 @@ export const usersApi = {
   update: (id: string, data: Record<string, any>) =>
     apiFetch(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) => apiFetch(`/users/${id}`, { method: 'DELETE' }),
+};
+
+// ---------------------------------------------------------------------------
+// Files — form file-field uploads
+// Meta shape stored in form values / submissions: { id, name, size, mimeType }
+// ---------------------------------------------------------------------------
+
+export interface FileMeta {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+}
+
+export const filesApi = {
+  /** Upload one file (multipart). Returns the meta to store in the form value. */
+  upload: async (file: File): Promise<FileMeta> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const t = getToken();
+    const res = await fetch(`${API_BASE}/files`, {
+      method: 'POST',
+      headers: {
+        ...(t ? { Authorization: `Bearer ${t}` } : {}),
+        // No Content-Type — the browser sets the multipart boundary itself
+      },
+      body: fd,
+    });
+    if (!res.ok) {
+      let msg = `upload failed (${res.status})`;
+      try {
+        const body = await res.json();
+        msg = body.message || body.error || msg;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  /** Download a previously uploaded file as a Blob (caller names the file). */
+  download: async (id: string): Promise<Blob> => {
+    const t = getToken();
+    const res = await fetch(`${API_BASE}/files/${id}`, {
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
+    });
+    if (!res.ok) throw new Error(`دانلود فایل ناموفق بود (${res.status})`);
+    return res.blob();
+  },
 };

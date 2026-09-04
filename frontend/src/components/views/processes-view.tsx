@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Workflow, Plus, RefreshCw, Trash2, Edit, Play } from 'lucide-react';
+import { ProcessPreviewDialog } from '@/components/processes/process-preview-dialog';
+import { Workflow, Plus, RefreshCw, Trash2, Edit, Eye, Play } from 'lucide-react';
 
 interface Props {
   onOpenDesigner: (processId?: string) => void;
@@ -18,6 +19,26 @@ export function ProcessesView({ onOpenDesigner }: Props) {
   const [processes, setProcesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // ---- read-only preview dialog state ----
+  const [previewProcess, setPreviewProcess] = useState<{ id: string; name: string } | null>(null);
+  const [previewXml, setPreviewXml] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const openPreview = async (proc: any) => {
+    setPreviewProcess({ id: proc.id, name: proc.name });
+    setPreviewXml(null);
+    setPreviewLoading(true);
+    try {
+      const full = await processesApi.findOne(proc.id);
+      setPreviewXml(full.bpmnXml || null);
+    } catch (err: any) {
+      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+      setPreviewProcess(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,6 +151,15 @@ export function ProcessesView({ onOpenDesigner }: Props) {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => openPreview(proc)}
+                            title="پیش‌نمایش (فقط خواندنی، همراه شرط‌ها)"
+                            className="text-violet-600"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => onOpenDesigner(proc.id)}
                             title="ویرایش"
                           >
@@ -165,6 +195,14 @@ export function ProcessesView({ onOpenDesigner }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      <ProcessPreviewDialog
+        open={!!previewProcess}
+        processName={previewProcess?.name || ''}
+        bpmnXml={previewXml}
+        loadingXml={previewLoading}
+        onClose={() => setPreviewProcess(null)}
+      />
     </div>
   );
 }

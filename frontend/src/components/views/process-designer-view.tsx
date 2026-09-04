@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { processesApi, formsApi, positionsApi } from '@/lib/api';
+import { processesApi, formsApi, positionsApi, usersApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +15,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { validateConditionXml } from '@/lib/condition-validation';
 import { BpmnDesigner, DEFAULT_BPMN_XML } from '@/components/bpmn/bpmn-designer';
 import { FormBuilderPanel } from '@/components/forms/form-builder-panel';
 import { TaskAssignmentModal } from '@/components/processes/task-assignment-modal';
+import { ProcessVersionsDialog } from '@/components/processes/process-versions-dialog';
+import {
+  GatewayConditionModal,
+  type ConditionVariable,
+} from '@/components/processes/gateway-condition-modal';
 import {
   ArrowRight,
   Save,
@@ -27,6 +33,7 @@ import {
   Plus,
   Edit3,
   Trash2,
+  History,
 } from 'lucide-react';
 
 interface Props {
@@ -61,9 +68,14 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   const [description, setDescription] = useState('');
   const [bpmnXml, setBpmnXml] = useState('');
   const [status, setStatus] = useState('DRAFT');
+  const [processVersion, setProcessVersion] = useState(1);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  // Bump to force-remount the modeler with fresh XML (e.g. after a version restore)
+  const [designerNonce, setDesignerNonce] = useState(0);
 
   const [forms, setForms] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, any>>({});
   const [processVariables, setProcessVariables] = useState<ProcessVariable[]>([]);
@@ -74,12 +86,21 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
 
   const [assignmentModalTask, setAssignmentModalTask] = useState<string | null>(null);
 
+  const [conditionTarget, setConditionTarget] = useState<{ element: any; modeler: any } | null>(
+    null,
+  );
+
+  const handleConditionAction = useCallback((element: any, modeler: any) => {
+    setConditionTarget({ element, modeler });
+  }, []);
+
   const loadProcessData = useCallback(async (pid: string) => {
-    const [proc, formsData, positionsData, userTasksData, existingAssignments, variablesData] =
+    const [proc, formsData, positionsData, usersData, userTasksData, existingAssignments, variablesData] =
       await Promise.all([
         processesApi.findOne(pid),
         formsApi.findAll(pid),
         positionsApi.findAll(),
+        usersApi.findAll(),
         processesApi.getUserTasks(pid),
         processesApi.getAssignments(pid),
         processesApi.getVariables(pid),
@@ -88,13 +109,17 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     setDescription(proc.description || '');
     setBpmnXml(proc.bpmnXml);
     setStatus(proc.status);
+    setProcessVersion(proc.version || 1);
     setForms(formsData);
     setPositions(positionsData);
+    setUsers(usersData);
     setUserTasks(userTasksData);
     setProcessVariables(variablesData);
     const map: Record<string, any> = {};
     existingAssignments.forEach((a: any) => {
       map[a.taskName] = {
+        strategy: a.strategy || (a.assigneeId ? 'FIXED_USER' : a.positionId ? 'POSITION' : 'FIXED_USER'),
+        sourceTaskName: a.sourceTaskName || '',
         positionId: a.positionId || '',
         assigneeId: a.assigneeId || '',
         formId: a.formId || '',
@@ -149,8 +174,20 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       type: field.type,
       formName: f.name,
       label: field.label,
+      options: field.options,
     })),
   );
+
+  // Merged, de-duplicated variables available to gateway conditions
+  const conditionVariables: ConditionVariable[] = (() => {
+    const map = new Map<string, ConditionVariable>();
+    processVariables.forEach((v) => map.set(v.name, { name: v.name, label: v.label, type: v.type }));
+    formFieldVariables.forEach((v) => {
+      if (!map.has(v.name))
+        map.set(v.name, { name: v.name, label: v.label, type: v.type, options: v.options });
+    });
+    return [...map.values()];
+  })();
 
   const handleXmlChange = useCallback((xml: string) => {
     setBpmnXml(xml);
@@ -172,13 +209,28 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       toast({ title: 'خطا', description: 'نام و طراحی فرآیند الزامی است', variant: 'destructive' });
       return;
     }
+    // Save-time gate: reject XML whose gateway conditions the engine would
+    // mis-evaluate (same rules as the backend — defense in depth)
+    const conditionIssues = validateConditionXml(bpmnXml);
+    if (conditionIssues.length > 0) {
+      toast({
+        title: 'ذخیره انجام نشد — شرط نامعتبر',
+        description: conditionIssues.map((i) => i.message).join('؛ '),
+        variant: 'destructive',
+        duration: 10000,
+      });
+      return;
+    }
     setSaving(true);
     try {
-      await processesApi.update(currentProcessId, { name, description, bpmnXml });
+      const updated = await processesApi.update(currentProcessId, { name, description, bpmnXml });
+      setProcessVersion(updated.version || processVersion);
 
       if (userTasks.length > 0) {
         const assignmentList = userTasks.map((ut) => ({
           taskName: ut.name,
+          strategy: assignments[ut.name]?.strategy || 'FIXED_USER',
+          sourceTaskName: assignments[ut.name]?.sourceTaskName || undefined,
           positionId: assignments[ut.name]?.positionId || undefined,
           assigneeId: assignments[ut.name]?.assigneeId || undefined,
           formId: assignments[ut.name]?.formId || undefined,
@@ -199,6 +251,17 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
 
   const handleActivate = async () => {
     if (!currentProcessId) return;
+    // Same gate as save: activation with broken conditions would hang/misroute instances
+    const conditionIssues = bpmnXml ? validateConditionXml(bpmnXml) : [];
+    if (conditionIssues.length > 0) {
+      toast({
+        title: 'فعال‌سازی انجام نشد — شرط نامعتبر',
+        description: conditionIssues.map((i) => i.message).join('؛ '),
+        variant: 'destructive',
+        duration: 10000,
+      });
+      return;
+    }
     try {
       await processesApi.update(currentProcessId, { status: 'ACTIVE' });
       setStatus('ACTIVE');
@@ -261,8 +324,22 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           {status === 'DRAFT' && (
             <Badge className="bg-gray-100 text-gray-600">پیش‌نویس</Badge>
           )}
+          <Badge
+            variant="outline"
+            className="border-emerald-200 text-emerald-700 bg-emerald-50 cursor-pointer hover:bg-emerald-100"
+            onClick={() => currentProcessId && setVersionsOpen(true)}
+            title="تاریخچه نسخه‌ها"
+          >
+            نسخه {processVersion}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
+          {currentProcessId && (
+            <Button variant="outline" size="sm" onClick={() => setVersionsOpen(true)}>
+              <History className="w-4 h-4 ml-2" />
+              نسخه‌ها
+            </Button>
+          )}
           {currentProcessId && status === 'DRAFT' && (
             <Button variant="outline" size="sm" onClick={handleActivate}>
               <Play className="w-4 h-4 ml-2" />
@@ -279,9 +356,11 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
           <BpmnDesigner
+            key={designerNonce}
             onXmlChange={handleXmlChange}
             initialXml={bpmnXml || undefined}
             onAssignmentAction={handleAssignmentFromContext}
+            onConditionAction={handleConditionAction}
           />
         </div>
 
@@ -364,9 +443,38 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           taskName={assignmentModalTask}
           assignment={assignments[assignmentModalTask] || {}}
           positions={positions}
+          users={users}
           forms={forms}
+          tasks={userTasks}
           onChange={(field, value) => updateAssignment(assignmentModalTask, field, value)}
           onClose={() => setAssignmentModalTask(null)}
+        />
+      )}
+
+      {conditionTarget && (
+        <GatewayConditionModal
+          open
+          element={conditionTarget.element}
+          modeler={conditionTarget.modeler}
+          variables={conditionVariables}
+          onClose={() => setConditionTarget(null)}
+        />
+      )}
+
+      {currentProcessId && (
+        <ProcessVersionsDialog
+          open={versionsOpen}
+          processId={currentProcessId}
+          processName={name}
+          currentVersion={processVersion}
+          onClose={() => setVersionsOpen(false)}
+          onRestored={(proc) => {
+            // Restore changed the current XML under us — reload it into the canvas
+            setBpmnXml(proc.bpmnXml);
+            setProcessVersion(proc.version || processVersion + 1);
+            setDesignerNonce((n) => n + 1);
+            toast({ title: 'بازگردانی انجام شد', description: `نسخه ${proc.version} به‌عنوان نسخه فعلی ذخیره شد` });
+          }}
         />
       )}
     </div>
@@ -562,8 +670,13 @@ function VariablesTab({
 
           {(vars.length > 0 || formFieldVariables.length > 0) && (
             <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
-              <p className="font-medium mb-1">مثال استفاده در دروازه:</p>
-              <code dir="ltr" className="text-[11px] block bg-white p-2 rounded mt-1">
+              <p className="font-medium mb-1">استفاده در شرط دروازه:</p>
+              <p className="leading-5">
+                روی دروازه انحصاری راست‌کلیک کنید و «مدیریت شرط‌ها» را انتخاب کنید؛ شرط‌ها به
+                صورت <span dir="ltr" className="font-mono">next(null, …)</span> روی فلش‌های خروجی ذخیره
+                می‌شوند. نمونه عبارت:
+              </p>
+              <code dir="ltr" className="text-[11px] block bg-white p-2 rounded mt-1 font-mono">
                 environment.variables.{vars[0]?.name || formFieldVariables[0]?.name} === 'value'
               </code>
             </div>

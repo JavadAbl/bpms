@@ -21,6 +21,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useCategories } from '@/hooks/use-categories';
+import { OptionSelect, CategoryChip } from '@/components/common/option-select';
+import { FileUploadField } from '@/components/common/file-upload-field';
+import { t } from '@/lib/i18n';
 import { formsApi } from '@/lib/api';
 import {
   Plus,
@@ -36,6 +40,8 @@ import {
   Variable,
   Eye,
   Code2,
+  Lock,
+  Paperclip,
 } from 'lucide-react';
 
 export interface FormField {
@@ -44,9 +50,15 @@ export interface FormField {
   type: string;
   required: boolean;
   options?: string[];
+  /** Reference to a global reusable category (takes precedence over options). */
+  categoryId?: string;
   variable?: string;
   placeholder?: string;
   defaultValue?: any;
+  /** Read-only at runtime: shows data filled in previous tasks, user cannot edit. */
+  readOnly?: boolean;
+  /** File fields only: allow multiple attachments (value is always an array of metas). */
+  multiple?: boolean;
 }
 
 const FIELD_TYPES = [
@@ -56,6 +68,7 @@ const FIELD_TYPES = [
   { value: 'date', label: 'تاریخ', icon: Calendar, color: 'bg-orange-100 text-orange-600' },
   { value: 'select', label: 'لیست انتخاب', icon: ListChecks, color: 'bg-cyan-100 text-cyan-600' },
   { value: 'checkbox', label: 'چک‌باکس', icon: CheckSquare, color: 'bg-pink-100 text-pink-600' },
+  { value: 'file', label: 'فایل', icon: Paperclip, color: 'bg-teal-100 text-teal-600' },
 ];
 
 interface FormBuilderDialogProps {
@@ -75,6 +88,7 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
   const [showXml, setShowXml] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { categories } = useCategories();
 
   const addField = (type: string) => {
     const typeLabel = FIELD_TYPES.find((ft) => ft.value === type)?.label || type;
@@ -234,9 +248,18 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                         <span className="text-xs text-gray-400">{i + 1}.</span>
                         <span className="font-medium text-sm">{field.label}</span>
                         {field.required && <Badge variant="destructive" className="text-xs">اجباری</Badge>}
+                        {field.readOnly && (
+                          <Badge variant="secondary" className="text-xs gap-1 bg-gray-100 text-gray-600">
+                            <Lock className="w-3 h-3" />
+                            {t.readOnlyField}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className="text-xs">
                           {FIELD_TYPES.find((ft) => ft.value === field.type)?.label || field.type}
                         </Badge>
+                        {field.type === 'select' && (
+                          <CategoryChip categoryId={field.categoryId} />
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Badge variant="secondary" className="text-xs font-mono" dir="ltr">
@@ -334,26 +357,77 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                     </Select>
                   </div>
 
-                  <div>
-                    <Label className="text-xs">مقدار پیش‌فرض (اختیاری)</Label>
-                    <Input
-                      value={selectedFieldData.defaultValue || ''}
-                      onChange={(e) => updateField(selectedField!, 'defaultValue', e.target.value)}
-                      className="h-8 mt-1"
-                    />
-                  </div>
+                  {selectedFieldData.type !== 'file' && (
+                    <div>
+                      <Label className="text-xs">مقدار پیش‌فرض (اختیاری)</Label>
+                      <Input
+                        value={selectedFieldData.defaultValue || ''}
+                        onChange={(e) => updateField(selectedField!, 'defaultValue', e.target.value)}
+                        className="h-8 mt-1"
+                      />
+                    </div>
+                  )}
 
                   {selectedFieldData.type === 'select' && (
+                    <div className="space-y-2">
+                      <Label className="text-xs">{t.optionsSource}</Label>
+                      <Select
+                        value={selectedFieldData.categoryId || '__inline__'}
+                        onValueChange={(v) => {
+                          if (v === '__inline__') {
+                            updateField(selectedField!, 'categoryId', undefined);
+                          } else {
+                            updateField(selectedField!, 'categoryId', v);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 mt-1 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__inline__">{t.sourceInline}</SelectItem>
+                          {categories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                              <span className="font-mono text-[10px] text-gray-400 mr-1" dir="ltr">
+                                ({c.key})
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {selectedFieldData.categoryId ? (
+                        <CategoryOptionsPreview categoryId={selectedFieldData.categoryId} />
+                      ) : (
+                        <div>
+                          <Label className="text-xs">گزینه‌ها (با کاما جدا کنید)</Label>
+                          <Textarea
+                            value={(selectedFieldData.options || []).join(', ')}
+                            onChange={(e) =>
+                              updateField(selectedField!, 'options', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
+                            }
+                            className="mt-1 text-sm min-h-[60px]"
+                            placeholder="گزینه۱, گزینه۲, گزینه۳"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedFieldData.type === 'file' && (
                     <div>
-                      <Label className="text-xs">گزینه‌ها (با کاما جدا کنید)</Label>
-                      <Textarea
-                        value={(selectedFieldData.options || []).join(', ')}
-                        onChange={(e) =>
-                          updateField(selectedField!, 'options', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
-                        }
-                        className="mt-1 text-sm min-h-[60px]"
-                        placeholder="گزینه۱, گزینه۲, گزینه۳"
-                      />
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={!!selectedFieldData.multiple}
+                          onCheckedChange={(checked) => updateField(selectedField!, 'multiple', checked === true)}
+                        />
+                        <Paperclip className="w-3.5 h-3.5 text-gray-500" />
+                        چند فایل
+                      </label>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        کاربر می‌تواند چند فایل پیوست کند؛ مقدار ذخیره‌شده فهرستی از پیوست‌هاست
+                      </p>
                     </div>
                   )}
 
@@ -364,6 +438,20 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                     />
                     اجباری
                   </label>
+
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={!!selectedFieldData.readOnly}
+                      onCheckedChange={(checked) => updateField(selectedField!, 'readOnly', checked === true)}
+                    />
+                    <Lock className="w-3.5 h-3.5 text-gray-500" />
+                    {t.readOnlyField}
+                  </label>
+                  {selectedFieldData.readOnly && (
+                    <p className="text-[10px] text-gray-400 -mt-1">
+                      {t.readOnlyHint}
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -394,6 +482,15 @@ function renderFieldPreview(field: FormField) {
       return <Input disabled type="number" placeholder={field.label} className="text-sm" dir="ltr" />;
     case 'date':
       return <Input disabled type="date" className="text-sm" dir="ltr" />;
+    case 'file':
+      return (
+        <FileUploadField
+          value={[]}
+          onChange={() => {}}
+          multiple={!!field.multiple}
+          previewMode
+        />
+      );
     case 'select':
       return (
         <Select disabled value="">
@@ -410,6 +507,41 @@ function renderFieldPreview(field: FormField) {
     default:
       return <Input disabled placeholder={field.label} className="text-sm" />;
   }
+}
+
+/** Shows the live items of the referenced category inside the properties panel. */
+function CategoryOptionsPreview({ categoryId }: { categoryId: string }) {
+  const { categories } = useCategories();
+  const category = categories.find((c) => c.id === categoryId);
+
+  if (!category) {
+    return (
+      <p className="text-[10px] text-red-500">
+        دسته‌بندی مرجع یافت نشد — ممکن است حذف شده باشد
+      </p>
+    );
+  }
+
+  return (
+    <div className="pt-1">
+      <p className="text-[10px] text-gray-400 mb-1">
+        گزینه‌ها از دسته‌بندی «{category.name}» خوانده می‌شود
+        {category.items.length > 0 ? ` (${category.items.length} مورد)` : ''}
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {category.items.length === 0 ? (
+          <span className="text-[10px] text-gray-400">{t.noItems}</span>
+        ) : (
+          category.items.map((it) => (
+            <Badge key={it.id} variant="secondary" className="text-[10px] font-normal">
+              {it.label}
+              <span className="text-gray-400 mr-1" dir="ltr">({it.value})</span>
+            </Badge>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }
 
 function PreviewForm({ fields }: { fields: FormField[] }) {
@@ -445,14 +577,20 @@ function PreviewForm({ fields }: { fields: FormField[] }) {
               dir="ltr"
             />
           ) : field.type === 'select' ? (
-            <Select value={values[field.name] || ''} onValueChange={(v) => setValues({ ...values, [field.name]: v })}>
-              <SelectTrigger><SelectValue placeholder="انتخاب کنید" /></SelectTrigger>
-              <SelectContent>
-                {(field.options || []).map((opt) => (
-                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <OptionSelect
+              categoryId={field.categoryId}
+              options={field.options}
+              value={values[field.name] || ''}
+              onChange={(v) => setValues({ ...values, [field.name]: v })}
+              placeholder="انتخاب کنید"
+            />
+          ) : field.type === 'file' ? (
+            <FileUploadField
+              value={values[field.name] || []}
+              onChange={(v) => setValues({ ...values, [field.name]: v })}
+              multiple={!!field.multiple}
+              previewMode
+            />
           ) : field.type === 'checkbox' ? (
             <div className="flex items-center gap-2">
               <Checkbox

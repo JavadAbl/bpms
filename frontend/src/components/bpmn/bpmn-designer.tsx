@@ -18,6 +18,8 @@ interface BpmnDesignerProps {
   onElementSelect?: (element: any) => void;
   initialXml?: string;
   onAssignmentAction?: (element: any) => void;
+  /** Fired when the user asks to edit gateway/flow conditions (context menu, toolbar button) */
+  onConditionAction?: (element: any, modeler: any) => void;
 }
 
 export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -64,6 +66,7 @@ export function BpmnDesigner({
   onElementSelect,
   initialXml,
   onAssignmentAction,
+  onConditionAction,
 }: BpmnDesignerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
@@ -81,9 +84,8 @@ export function BpmnDesigner({
 
       const modeler = new BpmnModeler({
         container: containerRef.current,
-        keyboard: {
-          bindTo: window,
-        },
+        // NOTE: diagram-js >= 8 removed `keyboard.bindTo` — binding to the
+        // document is now implicit. See https://github.com/bpmn-io/diagram-js/issues/661
         additionalModules: [taskLabelFixModule],
       });
       modelerRef.current = modeler;
@@ -272,6 +274,16 @@ export function BpmnDesigner({
     }
   }, [selectedElement]);
 
+  // Latest-ref so init-time listeners always call the current prop
+  const onConditionActionRef = useRef(onConditionAction);
+  onConditionActionRef.current = onConditionAction;
+
+  const selectedSupportsCondition =
+    !!selectedElement &&
+    (selectedElement.type === 'bpmn:ExclusiveGateway' ||
+      selectedElement.type === 'bpmn:InclusiveGateway' ||
+      selectedElement.type === 'bpmn:SequenceFlow');
+
   const paletteItems = [
     { type: 'startEvent', label: 'شروع', icon: '○', color: 'bg-green-500' },
     { type: 'userTask', label: 'وظیفه کاربر', icon: '☐', color: 'bg-blue-500' },
@@ -285,9 +297,22 @@ export function BpmnDesigner({
   const contextMenuItems = contextMenu?.element ? (() => {
     const el = contextMenu.element;
     const isTask = el.type?.includes('Task');
+    const isConditionalGateway =
+      el.type === 'bpmn:ExclusiveGateway' || el.type === 'bpmn:InclusiveGateway';
+    const isSequenceFlow = el.type === 'bpmn:SequenceFlow';
     const items: { label: string; icon: string; action: () => void; danger?: boolean }[] = [
       { label: 'ویرایش نام', icon: '✏️', action: () => { renameSelected(); setContextMenu(null); } },
     ];
+    if (isConditionalGateway || isSequenceFlow) {
+      items.push({
+        label: isConditionalGateway ? 'مدیریت شرط‌ها' : 'ویرایش شرط',
+        icon: '⚡',
+        action: () => {
+          onConditionActionRef.current?.(el, modelerRef.current);
+          setContextMenu(null);
+        },
+      });
+    }
     if (isTask) {
       items.push({
         label: 'تخصیص',
@@ -322,6 +347,21 @@ export function BpmnDesigner({
         ))}
 
         <div className="w-px h-6 bg-gray-300 mx-1" />
+
+        {/* Condition button — exclusive/inclusive gateways and sequence flows */}
+        <button
+          onClick={() => {
+            if (selectedSupportsCondition) {
+              onConditionActionRef.current?.(selectedElement, modelerRef.current);
+            }
+          }}
+          disabled={!selectedSupportsCondition}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-amber-700 hover:bg-amber-50 transition-all border border-transparent hover:border-amber-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          title="تنظیم شرط روی دروازه یا فلش انتخاب شده"
+        >
+          <span className="text-base leading-none">⚡</span>
+          <span className="hidden sm:inline">شرط</span>
+        </button>
 
         {/* Connect button */}
         <button

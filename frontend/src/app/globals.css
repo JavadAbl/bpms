@@ -120,3 +120,54 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------- Print: process preview (diagram + routing-condition list) ---------- */
+/* When the process preview dialog is open, printing produces a clean page:
+   the plain BPMN diagram, plus the full routing-condition list below it.
+   Everything else (app shell, modal chrome) is removed. */
+@media print {
+  /* Keep only the DOM subtree that contains the printable preview */
+  body:has(.process-print-area) > *:not(:has(.process-print-area)) {
+    display: none !important;
+  }
+
+  /* Neutralize the fixed/centered modal so content flows from the page top.
+     NOTE: Tailwind 4 centers dialogs with the INDIVIDUAL `translate`
+     property computed from --tw-translate-x/y custom properties. The CSS
+     minifier merges plain `translate`/`transform` resets into `transform:
+     none`, which does NOT cancel the utility — so we zero the custom
+     properties instead (minifiers never touch custom properties). */
+  body:has(.process-print-area) [data-slot="dialog-content"] {
+    position: static !important;
+    --tw-translate-x: 0 !important;
+    --tw-translate-y: 0 !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* Hide modal-only chrome (title bar, close X, hints) */
+  body:has(.process-print-area) [data-slot="dialog-close"],
+  body:has(.process-print-area) [data-slot="dialog-header"],
+  body:has(.process-print-area) .process-print-hide {
+    display: none !important;
+  }
+
+  /* Condition labels: never truncate on paper */
+  body:has(.process-print-area) .process-print-area code {
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+  }
+
+  /* Keep badge/badge colors on paper */
+  body:has(.process-print-area) * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

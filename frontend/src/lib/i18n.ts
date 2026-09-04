@@ -196,6 +196,40 @@ export const t = {
   holderRemoved: 'فرد از موقعیت حذف شد',
   assignmentsSaved: 'تخصیص‌ها ذخیره شدند',
   unknown: 'نامشخص',
+
+  // Categories (global reusable option lists)
+  categories: 'دسته‌بندی‌ها',
+  categoriesHint: 'لیست‌های گزینه قابل استفاده مجدد برای لیست‌های انتخاب فرم‌ها',
+  addCategory: 'افزودن دسته‌بندی',
+  editCategory: 'ویرایش دسته‌بندی',
+  categoryName: 'نام دسته‌بندی',
+  categoryKey: 'کلید یکتا',
+  categoryKeyHint: 'شناسه یکتا (حروف انگلیسی، رقم و _)',
+  categoryDesc: 'توضیحات دسته‌بندی',
+  categoryItems: 'موارد (value / label)',
+  categoryValue: 'مقدار (value)',
+  categoryLabel: 'برچسب نمایش',
+  addItem: 'افزودن مورد',
+  noCategories: 'دسته‌بندی‌ای یافت نشد',
+  categorySaved: 'دسته‌بندی ذخیره شد',
+  categoryDeleted: 'دسته‌بندی حذف شد',
+  confirmDeleteCategory: 'با حذف این دسته‌بندی، فرم‌هایی که از آن استفاده می‌کنند به گزینه‌های دستی خود برمی‌گردند. ادامه می‌دهید؟',
+  itemCount: 'تعداد موارد',
+  noItems: 'موردی ثبت نشده',
+
+  // Select field options source
+  optionsSource: 'منبع گزینه‌ها',
+  sourceInline: 'گزینه‌های دستی',
+  sourceCategory: 'دسته‌بندی مشترک',
+  selectCategory: 'انتخاب دسته‌بندی',
+  noCategoryAvailable: 'دسته‌بندی‌ای موجود نیست — ابتدا از بخش دسته‌بندی‌ها ایجاد کنید',
+  optionsSnapshotHint: 'گزینه‌های فعلی به‌عنوان پشتیبان نگه داشته می‌شوند',
+
+  // Read-only fields (display data filled in previous tasks)
+  readOnlyField: 'فقط‌خواندنی',
+  readOnlyHint: 'این فیلد از داده‌های وظایف قبلی همین فرآیند پر می‌شود و قابل ویرایش نیست',
+  readOnlySourceHint: 'مقدار واردشده در وظیفه قبلی',
+  invalidFormTitle: 'تکمیل فرم نامعتبر است',
 };
 
 export const statusColors: Record<string, string> = {

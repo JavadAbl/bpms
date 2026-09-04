@@ -10,11 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { OptionSelect } from '@/components/common/option-select';
+import { FileUploadField } from '@/components/common/file-upload-field';
+import { validateDynamicForm } from '@/components/common/dynamic-form';
 import {
   ArrowRight,
   Hand,
@@ -22,6 +24,8 @@ import {
   CheckCircle,
   Loader2,
   FileText,
+  Lock,
+  Info,
 } from 'lucide-react';
 
 interface Props {
@@ -43,13 +47,33 @@ export function TaskDetailView({ taskId, onBack }: Props) {
     try {
       const data = await tasksApi.findOne(taskId);
       setTask(data);
-      // Pre-fill form with existing submission data if any
+      // Pre-fill the form:
+      //  1. Data filled in PREVIOUS tasks of this instance (process variables)
+      //  2. Field default values
+      //  3. This task's own latest submission (draft recovery) — highest priority
+      const fields: any[] = data.form?.fields || [];
+      const vars: Record<string, any> = data.instanceVariables || {};
+      const prefill: Record<string, any> = {};
+      for (const f of fields) {
+        const varName = f.variable || f.name;
+        const fromInstance = vars[varName] ?? vars[f.name];
+        if (fromInstance !== undefined && fromInstance !== null && fromInstance !== '') {
+          prefill[f.name] = fromInstance;
+        } else if (
+          f.defaultValue !== undefined &&
+          f.defaultValue !== null &&
+          f.defaultValue !== ''
+        ) {
+          prefill[f.name] = f.defaultValue;
+        }
+      }
       if (data.submissions && data.submissions.length > 0) {
         const latest = data.submissions[data.submissions.length - 1];
         try {
-          setFormData(JSON.parse(latest.data));
+          Object.assign(prefill, JSON.parse(latest.data));
         } catch {}
       }
+      setFormData(prefill);
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
     } finally {
@@ -88,9 +112,33 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   };
 
   const handleComplete = async () => {
+    // Client-side validation: required editable fields must be filled.
+    // Read-only fields are excluded (they display previous tasks' data and
+    // cannot be edited — see validateDynamicForm).
+    const errors = validateDynamicForm(fields, formData);
+    if (Object.keys(errors).length > 0) {
+      const firstMsg = Object.values(errors)[0];
+      const firstField = fields.find((f: any) => errors[f.name]);
+      toast({
+        title: t.invalidFormTitle,
+        description: `${firstField?.label || ''}: ${firstMsg}`.trim(),
+        variant: 'destructive',
+      });
+      return;
+    }
     setSubmitting(true);
     try {
-      await tasksApi.complete(taskId, formData);
+      // Read-only fields are display-only mirrors of process variables:
+      // keep them when they carry a value (re-saving the same variable is
+      // harmless), but never submit an EMPTY read-only field — that would
+      // overwrite a real variable with an empty value.
+      const payload: Record<string, any> = { ...formData };
+      for (const f of fields) {
+        if (!f.readOnly) continue;
+        const v = payload[f.name];
+        if (v === undefined || v === null || v === '') delete payload[f.name];
+      }
+      await tasksApi.complete(taskId, payload);
       toast({ title: 'موفقیت', description: 'وظیفه تکمیل شد' });
       onBack();
     } catch (err: any) {
@@ -213,14 +261,37 @@ export function TaskDetailView({ taskId, onBack }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {fields.some((f: any) => f.readOnly) && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 text-blue-800 text-xs">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  مقادیر واردشده در وظایف قبلی این فرآیند به‌صورت خودکار نمایش داده می‌شوند؛ فیلدهای
+                  فقط‌خواندنی قابل ویرایش نیستند.
+                </span>
+              </div>
+            )}
             {fields.map((field: any) => (
               <div key={field.name} className="space-y-2">
-                <Label htmlFor={field.name}>
+                <Label htmlFor={field.name} className="flex items-center gap-1.5">
                   {field.label}
-                  {field.required && <span className="text-red-500 mr-1">*</span>}
+                  {field.required && !field.readOnly && (
+                    <span className="text-red-500">*</span>
+                  )}
+                  {field.readOnly && (
+                    <Lock className="w-3 h-3 text-gray-400" />
+                  )}
                 </Label>
                 {renderField(field, formData[field.name], (val) =>
                   setFormData({ ...formData, [field.name]: val }),
+                )}
+                {field.readOnly && (
+                  <p className="text-[11px] text-gray-400">
+                    {formData[field.name] !== undefined &&
+                    formData[field.name] !== null &&
+                    formData[field.name] !== ''
+                      ? t.readOnlySourceHint
+                      : t.readOnlyHint}
+                  </p>
                 )}
               </div>
             ))}
@@ -253,20 +324,53 @@ export function TaskDetailView({ taskId, onBack }: Props) {
             <CardTitle className="text-base">ارسال‌های قبلی</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {task.submissions.map((sub: any, i: number) => (
-              <div key={sub.id} className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500 mb-2">
-                  {new Date(sub.submittedAt).toLocaleDateString('fa-IR')}
-                </p>
-                <pre className="text-sm text-gray-700" dir="ltr">
-                  {JSON.stringify(JSON.parse(sub.data), null, 2)}
-                </pre>
-              </div>
-            ))}
+            {task.submissions.map((sub: any, i: number) => {
+              let parsed: Record<string, any> = {};
+              try {
+                parsed = JSON.parse(sub.data);
+              } catch {}
+              return (
+                <div key={sub.id} className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-2">
+                    {new Date(sub.submittedAt).toLocaleDateString('fa-IR')}
+                  </p>
+                  <div className="space-y-2">
+                    {Object.entries(parsed).map(([k, v]) =>
+                      looksLikeFileList(v) ? (
+                        <div key={k}>
+                          <p className="text-[11px] text-gray-400 mb-1">{k}</p>
+                          <FileUploadField value={v as any} onChange={() => {}} disabled />
+                        </div>
+                      ) : (
+                        <p key={k} className="text-sm text-gray-700" dir="auto">
+                          <span className="text-gray-400">{k}: </span>
+                          {String(v)}
+                        </p>
+                      ),
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
     </div>
+  );
+}
+
+/** Detects file-field values: array of {id, name, ...} metas (or a single meta object). */
+function looksLikeFileList(v: any): boolean {
+  const items = Array.isArray(v) ? v : [v];
+  return (
+    items.length > 0 &&
+    items.every(
+      (it) =>
+        it &&
+        typeof it === 'object' &&
+        typeof (it as any).id === 'string' &&
+        typeof (it as any).name === 'string',
+    )
   );
 }
 
@@ -275,7 +379,24 @@ function renderField(
   value: any,
   onChange: (val: any) => void,
 ) {
+  const locked = !!field.readOnly;
   switch (field.type) {
+    case 'file': {
+      const fileValue = Array.isArray(value)
+        ? value
+        : value && typeof value === 'object'
+          ? [value]
+          : [];
+      return (
+        <FileUploadField
+          value={fileValue}
+          onChange={onChange}
+          multiple={!!field.multiple}
+          disabled={locked}
+          fromPreviousTask={locked}
+        />
+      );
+    }
     case 'textarea':
       return (
         <Textarea
@@ -283,6 +404,8 @@ function renderField(
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
+          disabled={locked}
+          className={locked ? 'bg-gray-50 text-gray-600' : undefined}
         />
       );
     case 'number':
@@ -293,8 +416,9 @@ function renderField(
           value={value ?? ''}
           onChange={(e) => onChange(Number(e.target.value))}
           required={field.required}
+          disabled={locked}
           dir="ltr"
-          className="text-left"
+          className={`text-left ${locked ? 'bg-gray-50 text-gray-600' : ''}`}
         />
       );
     case 'date':
@@ -305,24 +429,22 @@ function renderField(
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
+          disabled={locked}
           dir="ltr"
-          className="text-left"
+          className={`text-left ${locked ? 'bg-gray-50 text-gray-600' : ''}`}
         />
       );
     case 'select':
       return (
-        <Select value={value || ''} onValueChange={onChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="انتخاب کنید" />
-          </SelectTrigger>
-          <SelectContent>
-            {(field.options || []).map((opt: string) => (
-              <SelectItem key={opt} value={opt}>
-                {opt}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <OptionSelect
+          id={field.name}
+          categoryId={field.categoryId}
+          options={field.options}
+          value={value}
+          onChange={onChange}
+          disabled={locked}
+          placeholder="انتخاب کنید"
+        />
       );
     case 'checkbox':
       return (
@@ -331,6 +453,7 @@ function renderField(
             id={field.name}
             checked={value || false}
             onCheckedChange={(checked) => onChange(checked === true)}
+            disabled={locked}
           />
           <Label htmlFor={field.name} className="text-sm font-normal">
             {field.label}
@@ -344,6 +467,8 @@ function renderField(
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
+          disabled={locked}
+          className={locked ? 'bg-gray-50 text-gray-600' : undefined}
         />
       );
   }
