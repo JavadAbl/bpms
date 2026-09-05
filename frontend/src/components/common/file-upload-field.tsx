@@ -110,7 +110,7 @@ export function FileUploadField({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading || (!multiple && files.length > 0)}
-          className="w-full border border-dashed border-gray-300 rounded-md py-3 px-3 flex items-center justify-center gap-2 text-sm text-gray-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full border border-dashed border-border rounded-xl py-3.5 px-3 flex items-center justify-center gap-2 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary hover:bg-primary/8 active:bg-primary/12 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         >
           {uploading ? (
             <>
@@ -121,7 +121,7 @@ export function FileUploadField({
             <>
               <Paperclip className="w-4 h-4" />
               {multiple ? 'انتخاب فایل (می‌توانید چند فایل پیوست کنید)' : 'انتخاب فایل'}
-              <span className="text-[10px] text-gray-400">(حداکثر ۱۰ مگابایت)</span>
+              <span className="text-[10px] text-muted-foreground/80">(حداکثر ۱۰ مگابایت)</span>
             </>
           )}
         </button>
@@ -139,18 +139,20 @@ export function FileUploadField({
           {files.map((f) => (
             <li
               key={f.id}
-              className="flex items-center gap-2 border rounded-md px-2.5 py-1.5 bg-gray-50 text-sm"
+              className="flex items-center gap-2.5 rounded-full border border-border/70 bg-muted/40 pl-4 pr-1.5 py-1.5 text-sm hover:bg-accent/60 transition-colors"
             >
-              <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="truncate flex-1" title={f.name}>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+                <FileText className="w-3.5 h-3.5" />
+              </span>
+              <span className="truncate flex-1 font-medium" title={f.name} dir="auto">
                 {f.name}
               </span>
-              <span className="text-[10px] text-gray-400 shrink-0">{fmtSize(f.size)}</span>
+              <span className="text-[10px] text-muted-foreground/80 shrink-0">{fmtSize(f.size)}</span>
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="h-6 px-1.5 text-gray-500 hover:text-emerald-700"
+                size="icon"
+                className="size-7 rounded-full text-muted-foreground hover:text-primary"
                 onClick={() => download(f)}
                 title="دانلود"
               >
@@ -164,8 +166,8 @@ export function FileUploadField({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
-                  className="h-6 px-1.5 text-gray-400 hover:text-red-600"
+                  size="icon"
+                  className="size-7 rounded-full text-muted-foreground/80 hover:text-destructive"
                   onClick={() => removeFile(f.id)}
                   title="حذف"
                 >
@@ -178,12 +180,12 @@ export function FileUploadField({
       )}
 
       {disabled && files.length === 0 && (
-        <p className="text-xs text-gray-400">پیوستی ثبت نشده است</p>
+        <p className="text-xs text-muted-foreground/80">پیوستی ثبت نشده است</p>
       )}
       {fromPreviousTask && files.length > 0 && (
-        <p className="text-[11px] text-gray-400">پیوست‌های ثبت‌شده در وظیفه‌های قبلی</p>
+        <p className="text-[11px] text-muted-foreground/80">پیوست‌های ثبت‌شده در وظیفه‌های قبلی</p>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

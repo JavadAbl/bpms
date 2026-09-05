@@ -53,13 +53,13 @@ interface FormField {
 }
 
 const FIELD_TYPES = [
-  { value: 'text', label: 'متن', icon: Type, color: 'bg-blue-100 text-blue-600' },
-  { value: 'textarea', label: 'متن بلند', icon: AlignLeft, color: 'bg-purple-100 text-purple-600' },
-  { value: 'number', label: 'عدد', icon: Hash, color: 'bg-green-100 text-green-600' },
-  { value: 'date', label: 'تاریخ', icon: Calendar, color: 'bg-orange-100 text-orange-600' },
-  { value: 'select', label: 'لیست', icon: ListChecks, color: 'bg-cyan-100 text-cyan-600' },
-  { value: 'checkbox', label: 'چک‌باکس', icon: CheckSquare, color: 'bg-pink-100 text-pink-600' },
-  { value: 'file', label: 'فایل', icon: Paperclip, color: 'bg-teal-100 text-teal-600' },
+  { value: 'text', label: 'متن', icon: Type, color: 'bg-primary/15 text-primary' },
+  { value: 'textarea', label: 'متن بلند', icon: AlignLeft, color: 'bg-primary-container text-primary' },
+  { value: 'number', label: 'عدد', icon: Hash, color: 'bg-success/15 text-success' },
+  { value: 'date', label: 'تاریخ', icon: Calendar, color: 'bg-warning/15 text-warning' },
+  { value: 'select', label: 'لیست', icon: ListChecks, color: 'bg-primary/15 text-primary' },
+  { value: 'checkbox', label: 'چک‌باکس', icon: CheckSquare, color: 'bg-destructive/10 text-destructive' },
+  { value: 'file', label: 'فایل', icon: Paperclip, color: 'bg-success/15 text-success' },
 ];
 
 interface ProcessVariableRef {
@@ -207,21 +207,26 @@ export function FormBuilderPanel({
 
   return (
     <div className="fixed inset-0 z-[60] flex" dir="rtl" onClick={onClose}>
-      <div className="flex-1 bg-black/20" />
+      <div className="flex-1 bg-black/30 backdrop-blur-[1px]" />
       <div
-        className="w-[640px] bg-white shadow-2xl flex flex-col h-full ml-auto"
+        className="w-[640px] max-w-full bg-card shadow-elev-3 flex flex-col h-full ml-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-          <h3 className="font-medium">{form ? 'ویرایش فرم' : 'ایجاد فرم جدید'}</h3>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h3 className="font-medium flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+              <ListChecks className="w-4 h-4" />
+            </span>
+            {form ? 'ویرایش فرم' : 'ایجاد فرم جدید'}
+          </h3>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
         </div>
 
         {/* Form info */}
-        <div className="p-4 border-b border-gray-200 space-y-3">
+        <div className="p-4 border-b border-border space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">نام فرم *</Label>
@@ -235,17 +240,17 @@ export function FormBuilderPanel({
         </div>
 
         {/* Field palette */}
-        <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500">افزودن فیلد:</span>
+        <div className="px-4 py-2.5 border-b border-border flex items-center gap-1.5 flex-wrap bg-muted/40">
+          <span className="text-xs text-muted-foreground ml-1">افزودن فیلد:</span>
           {FIELD_TYPES.map((ft) => {
             const Icon = ft.icon;
             return (
               <button
                 key={ft.value}
                 onClick={() => addField(ft.value)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-gray-50 border border-transparent hover:border-gray-200"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs bg-card border border-border hover:border-primary/40 hover:bg-primary/8 hover:text-primary transition-colors"
               >
-                <span className={`w-5 h-5 rounded flex items-center justify-center ${ft.color}`}>
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center ${ft.color}`}>
                   <Icon className="w-3 h-3" />
                 </span>
                 {ft.label}
@@ -259,7 +264,7 @@ export function FormBuilderPanel({
           {/* Fields list */}
           <div className="flex-1 overflow-y-auto p-4">
             {fields.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400">
+              <div className="flex items-center justify-center h-full text-muted-foreground/80">
                 <div className="text-center">
                   <p className="text-sm">هنوز فیلدی اضافه نشده</p>
                   <p className="text-xs mt-1">از پالت بالا فیلد اضافه کنید</p>
@@ -271,19 +276,19 @@ export function FormBuilderPanel({
                   <div
                     key={i}
                     onClick={() => setSelectedField(i)}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
                       selectedField === i
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-primary/60 bg-primary/8 ring-2 ring-primary/25'
+                        : 'border-border hover:bg-accent/50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-xs text-gray-400">{i + 1}.</span>
+                        <span className="text-xs text-muted-foreground/80">{i + 1}.</span>
                         <span className="font-medium text-sm">{field.label}</span>
                         {field.required && <Badge variant="destructive" className="text-xs">اجباری</Badge>}
                         {field.readOnly && (
-                          <Badge variant="secondary" className="text-xs gap-1 bg-gray-100 text-gray-600">
+                          <Badge variant="secondary" className="text-xs gap-1 bg-muted text-muted-foreground">
                             <Lock className="w-3 h-3" />
                             {t.readOnlyField}
                           </Badge>
@@ -300,13 +305,13 @@ export function FormBuilderPanel({
                           <Variable className="w-3 h-3 ml-1" />
                           {field.variable || field.name}
                         </Badge>
-                        <button onClick={(e) => { e.stopPropagation(); moveField(i, 'up'); }} className="p-1 hover:bg-gray-100 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); moveField(i, 'up'); }} className="p-1 hover:bg-accent rounded">
                           <ArrowUp className="w-3 h-3" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); moveField(i, 'down'); }} className="p-1 hover:bg-gray-100 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); moveField(i, 'down'); }} className="p-1 hover:bg-accent rounded">
                           <ArrowDown className="w-3 h-3" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); removeField(i); }} className="p-1 hover:bg-red-50 text-red-600 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); removeField(i); }} className="p-1 hover:bg-destructive/10 text-destructive rounded">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
@@ -318,10 +323,10 @@ export function FormBuilderPanel({
           </div>
 
           {/* Properties panel */}
-          <div className="w-64 border-r border-gray-200 bg-gray-50 p-3 overflow-y-auto">
+          <div className="w-64 shrink-0 border-r border-border bg-muted/50 p-3 overflow-y-auto">
             {selectedFieldData ? (
               <div className="space-y-3">
-                <p className="text-xs font-medium text-gray-500">ویژگی‌های فیلد</p>
+                <p className="text-xs font-medium text-muted-foreground">ویژگی‌های فیلد</p>
                 <div className="space-y-2">
                   <div>
                     <Label className="text-xs">برچسب</Label>
@@ -358,7 +363,7 @@ export function FormBuilderPanel({
                           {predefinedOptions.map((v) => (
                             <SelectItem key={v.name} value={v.name}>
                               <span className="font-mono text-xs" dir="ltr">{v.name}</span>
-                              <span className="text-gray-400 text-xs mr-2">
+                              <span className="text-muted-foreground/80 text-xs mr-2">
                                 ({v.label} — {v.formName})
                               </span>
                             </SelectItem>
@@ -366,12 +371,12 @@ export function FormBuilderPanel({
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-[10px] text-gray-400 mt-1">
+                      <p className="text-[10px] text-muted-foreground/80 mt-1">
                         متغیر از تب «متغیرها» تعریف نشده — نام جدید در ذخیره ثبت می‌شود
                       </p>
                     )}
 
-                    <p className="text-[10px] text-gray-400 mt-2 mb-1">یا نام متغیر جدید:</p>
+                    <p className="text-[10px] text-muted-foreground/80 mt-2 mb-1">یا نام متغیر جدید:</p>
                     <Input
                       value={selectedFieldData.variable || ''}
                       onChange={(e) => {
@@ -382,7 +387,7 @@ export function FormBuilderPanel({
                       dir="ltr"
                       placeholder="مثال: leaveType"
                     />
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground/80 mt-1">
                       اگر از لیست انتخاب نکنید، متغیر جدید هنگام ذخیره فرم ایجاد می‌شود
                     </p>
                   </div>
@@ -423,7 +428,7 @@ export function FormBuilderPanel({
                           {categories.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
-                              <span className="font-mono text-[10px] text-gray-400 mr-1" dir="ltr">
+                              <span className="font-mono text-[10px] text-muted-foreground/80 mr-1" dir="ltr">
                                 ({c.key})
                               </span>
                             </SelectItem>
@@ -454,10 +459,10 @@ export function FormBuilderPanel({
                           checked={!!selectedFieldData.multiple}
                           onCheckedChange={(checked) => updateField(selectedField!, 'multiple', checked === true)}
                         />
-                        <Paperclip className="w-3.5 h-3.5 text-gray-500" />
+                        <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
                         چند فایل
                       </label>
-                      <p className="text-[10px] text-gray-400 mt-1">
+                      <p className="text-[10px] text-muted-foreground/80 mt-1">
                         مقدار ذخیره‌شده فهرستی از پیوست‌هاست — وظیفه‌های بعدی می‌توانند دانلود کنند
                       </p>
                     </div>
@@ -475,18 +480,18 @@ export function FormBuilderPanel({
                       checked={!!selectedFieldData.readOnly}
                       onCheckedChange={(checked) => updateField(selectedField!, 'readOnly', checked === true)}
                     />
-                    <Lock className="w-3.5 h-3.5 text-gray-500" />
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                     {t.readOnlyField}
                   </label>
                   {selectedFieldData.readOnly && (
-                    <p className="text-[10px] text-gray-400 -mt-1">
+                    <p className="text-[10px] text-muted-foreground/80 -mt-1">
                       {t.readOnlyHint}
                     </p>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="text-center text-gray-400 mt-8">
+              <div className="text-center text-muted-foreground/80 mt-8">
                 <p className="text-xs">یک فیلد را انتخاب کنید</p>
               </div>
             )}
@@ -494,9 +499,9 @@ export function FormBuilderPanel({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+        <div className="flex justify-end gap-2 p-4 border-t border-border bg-muted/30">
           <Button variant="outline" onClick={onClose}>انصراف</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? 'در حال ذخیره...' : 'ذخیره فرم'}
           </Button>
         </div>
@@ -512,7 +517,7 @@ function CategoryOptionsPreview({ categoryId }: { categoryId: string }) {
 
   if (!category) {
     return (
-      <p className="text-[10px] text-red-500">
+      <p className="text-[10px] text-destructive">
         دسته‌بندی مرجع یافت نشد — ممکن است حذف شده باشد
       </p>
     );
@@ -520,18 +525,18 @@ function CategoryOptionsPreview({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="pt-1">
-      <p className="text-[10px] text-gray-400 mb-1">
+      <p className="text-[10px] text-muted-foreground/80 mb-1">
         گزینه‌ها از دسته‌بندی «{category.name}» خوانده می‌شود
         {category.items.length > 0 ? ` (${category.items.length} مورد)` : ''}
       </p>
       <div className="flex flex-wrap gap-1">
         {category.items.length === 0 ? (
-          <span className="text-[10px] text-gray-400">{t.noItems}</span>
+          <span className="text-[10px] text-muted-foreground/80">{t.noItems}</span>
         ) : (
           category.items.map((it) => (
             <Badge key={it.id} variant="secondary" className="text-[10px] font-normal">
               {it.label}
-              <span className="text-gray-400 mr-1" dir="ltr">({it.value})</span>
+              <span className="text-muted-foreground/80 mr-1" dir="ltr">({it.value})</span>
             </Badge>
           ))
         )}

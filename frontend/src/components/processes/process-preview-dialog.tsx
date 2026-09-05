@@ -109,8 +109,10 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
         dir="rtl"
       >
         <DialogHeader className="flex flex-row items-center gap-2 print:hidden">
-          <DialogTitle className="flex items-center gap-2 text-base flex-1">
-            <GitBranch className="w-4 h-4 text-emerald-600" />
+          <DialogTitle className="flex items-center gap-2.5 text-base flex-1">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
+              <GitBranch className="w-4 h-4" />
+            </span>
             پیش‌نمایش فرآیند: {processName}
           </DialogTitle>
           <Button
@@ -127,7 +129,7 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
         {loadingXml ? (
           <Skeleton className="h-[380px] w-full rounded-lg" />
         ) : error ? (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+          <div className="p-3 bg-destructive/10 border border-destructive/25 rounded-xl text-xs text-destructive">
             خطا در بارگذاری نمودار: {error}
           </div>
         ) : (
@@ -136,7 +138,7 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
               {/* print-only header — replaces the dialog title on paper */}
               <div className="hidden print:block mb-1">
                 <p className="text-lg font-bold">فرآیند: {processName}</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   نمودار فرآیند و شرط‌های مسیریابی — چاپ‌شده در{' '}
                   {new Date().toLocaleDateString('fa-IR')}
                 </p>
@@ -146,22 +148,22 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
                 <div
                   ref={containerRef}
                   dir="ltr"
-                  className="w-full h-[380px] border border-gray-200 rounded-lg bg-gray-50 bpmn-canvas-container"
+                  className="w-full h-[380px] border border-border/60 rounded-xl bg-muted/50 bpmn-canvas-container"
                 />
                 {importing && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-lg print:hidden">
-                    <p className="text-xs text-gray-400">در حال بارگذاری نمودار…</p>
+                  <div className="absolute inset-0 flex items-center justify-center bg-card/60 rounded-lg print:hidden">
+                    <p className="text-xs text-muted-foreground/80">در حال بارگذاری نمودار…</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <p className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-2">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                <p className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                  <Zap className="w-3.5 h-3.5 text-warning" />
                   شرط‌های مسیریابی ({conditions.length})
                 </p>
                 {conditions.length === 0 ? (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground/80">
                     این فرآیند هیچ شرط مسیریابی (دروازه شرطی) ندارد.
                   </p>
                 ) : (
@@ -169,19 +171,19 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
                     {conditions.map((c) => (
                       <li
                         key={c.flowId}
-                        className="flex items-center gap-2 text-xs bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1.5"
+                        className="flex items-center gap-2 text-xs bg-muted/50 border border-border/60 rounded-xl px-2.5 py-1.5"
                       >
-                        <span className="text-gray-500 shrink-0">{c.sourceLabel}</span>
-                        <span className="text-gray-300">→</span>
+                        <span className="text-muted-foreground shrink-0">{c.sourceLabel}</span>
+                        <span className="text-muted-foreground/60">→</span>
                         <span className="font-medium shrink-0">{c.targetLabel}</span>
                         {c.isDefault && !c.body ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 text-[10px] shrink-0">
+                          <Badge className="bg-primary-container text-on-primary-container text-[10px] shrink-0">
                             فلش پیش‌فرض
                           </Badge>
                         ) : (
                           <code
                             dir="ltr"
-                            className="font-mono text-[10px] bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-700 truncate"
+                            className="font-mono text-[10px] bg-card border border-border rounded px-1.5 py-0.5 text-foreground truncate"
                           >
                             {shortCondition(c.body)}
                           </code>
@@ -193,7 +195,7 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
               </div>
             </div>
 
-            <p className="text-[10px] text-gray-400 process-print-hide">
+            <p className="text-[10px] text-muted-foreground/80 process-print-hide">
               با دکمه «چاپ»، نمودار به همراه فهرست کامل شرط‌های مسیریابی روی کاغذ چاپ می‌شود.
             </p>
           </>

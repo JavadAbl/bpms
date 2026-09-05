@@ -4,7 +4,7 @@
  * This avoids CORS issues — all calls are same-origin.
  */
 
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:3001/api';
 
 let token: string | null = null;
 
@@ -77,6 +77,23 @@ export const authApi = {
     ),
   register: (email: string, name: string, password: string) =>
     apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ email, name, password }) }),
+};
+
+// ---------------------------------------------------------------------------
+// Dashboard (UI redesign Phase 3) — aggregated KPIs, ADMIN global / USER own
+// ---------------------------------------------------------------------------
+export interface DashboardData {
+  myPendingTasks: number;
+  runningInstances: number;
+  activeProcesses: number;
+  completedLast7Days: { date: string; count: number }[];
+  instancesByStatus: Record<string, number>;
+  recentTasks: any[];
+  recentInstances: any[];
+}
+
+export const dashboardApi = {
+  get: () => apiFetch<DashboardData>('/dashboard'),
 };
 
 // ---------------------------------------------------------------------------
@@ -249,6 +266,18 @@ export interface FileMeta {
   mimeType: string;
 }
 
+/** Row returned by GET /files/by-instance/:instanceId (file_attachments + uploader). */
+export interface InstanceAttachment {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  taskId: string | null;
+  instanceId: string | null;
+  createdAt: string;
+  submittedBy: { id: string; name: string; email: string } | null;
+}
+
 export const filesApi = {
   /** Upload one file (multipart). Returns the meta to store in the form value. */
   upload: async (file: File): Promise<FileMeta> => {
@@ -284,5 +313,15 @@ export const filesApi = {
     });
     if (!res.ok) throw new Error(`دانلود فایل ناموفق بود (${res.status})`);
     return res.blob();
+  },
+
+  /** List every attachment stamped onto a process instance (uploader info included). */
+  byInstance: async (instanceId: string): Promise<InstanceAttachment[]> => {
+    const t = getToken();
+    const res = await fetch(`${API_BASE}/files/by-instance/${instanceId}`, {
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
+    });
+    if (!res.ok) throw new Error(`دریافت پیوست‌ها ناموفق بود (${res.status})`);
+    return res.json();
   },
 };

@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { UserPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -95,13 +96,18 @@ export function TaskAssignmentModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader>
-          <DialogTitle>تخصیص — {taskName}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2.5">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+              <UserPlus className="w-4 h-4" />
+            </span>
+            <span className="min-w-0">تخصیص — <span className="truncate align-middle">{taskName}</span></span>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Assignment strategy — declarative, no triggers needed */}
           <div>
-            <label className="text-xs text-gray-500">تخصیص به</label>
+            <label className="text-xs font-medium text-muted-foreground">تخصیص به</label>
             <Select
               value={strategy}
               onValueChange={(v) => onChange('strategy', v)}
@@ -118,7 +124,7 @@ export function TaskAssignmentModal({
               </SelectContent>
             </Select>
             {currentOption && (
-              <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+              <p className="text-[11px] text-muted-foreground/80 mt-1.5 leading-relaxed bg-muted/60 rounded-lg px-2.5 py-2">
                 {currentOption.hint}
               </p>
             )}
@@ -126,7 +132,7 @@ export function TaskAssignmentModal({
 
           {isStarterBased && (
             <div>
-              <label className="text-xs text-gray-500">وظیفه مبدأ</label>
+              <label className="text-xs font-medium text-muted-foreground">وظیفه مبدأ</label>
               <Select
                 value={assignment.sourceTaskName || 'none'}
                 onValueChange={(v) => onChange('sourceTaskName', v === 'none' ? '' : v)}
@@ -144,12 +150,12 @@ export function TaskAssignmentModal({
                 </SelectContent>
               </Select>
               {sourceCandidates.length === 0 && (
-                <p className="text-[11px] text-amber-600 mt-1.5">
+                <p className="text-[11px] text-warning mt-1.5">
                   وظیفه دیگری در این فرآیند وجود ندارد — ابتدا یک وظیفه دیگر اضافه کنید
                 </p>
               )}
               {sourceCandidates.length > 0 && !assignment.sourceTaskName && (
-                <p className="text-[11px] text-amber-600 mt-1.5">
+                <p className="text-[11px] text-warning mt-1.5">
                   انتخاب وظیفه مبدأ الزامی است — تخصیص بر اساس انجام‌دهنده همان وظیفه حل می‌شود
                 </p>
               )}
@@ -158,7 +164,7 @@ export function TaskAssignmentModal({
 
           {strategy === 'FIXED_USER' && (
             <div>
-              <label className="text-xs text-gray-500">کاربر</label>
+              <label className="text-xs font-medium text-muted-foreground">کاربر</label>
               <Select
                 value={assignment.assigneeId || 'none'}
                 onValueChange={(v) => onChange('assigneeId', v === 'none' ? '' : v)}
@@ -180,7 +186,7 @@ export function TaskAssignmentModal({
 
           {strategy === 'POSITION' && (
             <div>
-              <label className="text-xs text-gray-500">سمت</label>
+              <label className="text-xs font-medium text-muted-foreground">سمت</label>
               <Select
                 value={assignment.positionId || 'none'}
                 onValueChange={(v) => onChange('positionId', v === 'none' ? '' : v)}
@@ -201,7 +207,7 @@ export function TaskAssignmentModal({
           )}
 
           <div>
-            <label className="text-xs text-gray-500">فرم</label>
+            <label className="text-xs font-medium text-muted-foreground">فرم</label>
             <Select
               value={assignment.formId || 'none'}
               onValueChange={(v) => onChange('formId', v === 'none' ? '' : v)}
@@ -232,9 +238,7 @@ export function TaskAssignmentModal({
         </div>
 
         <DialogFooter>
-          <Button onClick={onClose} className="bg-emerald-600 hover:bg-emerald-700">
-            تأیید
-          </Button>
+          <Button onClick={onClose}>تأیید</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

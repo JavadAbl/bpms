@@ -72,7 +72,7 @@ async function getInstance(token, id) {
   // -----------------------------------------------------------------------
   {
     const inst = await api(john, '/process-instances', { method: 'POST', body: JSON.stringify({ processId: proc.id }) });
-    const submit = await waitForTask(john, (t) => t.name === 'ثبت درخواست مرخصی', 'ثبت درخواست مرخصی');
+    const submit = await waitForTask(john, (t) => t.name === 'ثبت درخواست مرخصی' && t.processInstanceId === inst.id, 'ثبت درخواست مرخصی');
     await api(john, `/tasks/${submit.id}/complete`, { method: 'POST', body: JSON.stringify({ data: { ...submitForm, leaveType: 'Sick' } }) });
     await new Promise((r) => setTimeout(r, 1500));
     const after = await getInstance(john, inst.id);

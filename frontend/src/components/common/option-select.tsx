@@ -67,7 +67,7 @@ export function CategoryChip({ categoryId }: { categoryId?: string | null }) {
   if (!categoryId) return null;
   const category = categories.find((c) => c.id === categoryId);
   return (
-    <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-200 bg-emerald-50 gap-1">
+    <Badge variant="outline" className="text-[10px] text-primary border-primary/30 bg-primary/10 gap-1">
       <Tags className="w-2.5 h-2.5" />
       {category ? category.name : '؟'}
     </Badge>

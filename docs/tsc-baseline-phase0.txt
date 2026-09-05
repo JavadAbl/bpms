@@ -1,0 +1,26 @@
+scripts/fix-seed-di.ts(195,31): error TS2339: Property 'process' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/fix-seed-di.ts(202,18): error TS2339: Property 'process' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/components/bpmn/bpmn-designer.tsx(95,9): error TS2571: Object is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(98,21): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/components/bpmn/bpmn-designer.tsx(104,9): error TS18046: 'eventBus' is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(109,27): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/components/bpmn/bpmn-designer.tsx(116,9): error TS18046: 'eventBus' is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(143,24): error TS2571: Object is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(146,15): error TS2571: Object is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(161,30): error TS18046: 'selection' is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(166,15): error TS18046: 'modeling' is of type 'unknown'.
+src/components/forms/form-builder.tsx(138,40): error TS2345: Argument of type '{ name: any; description: any; fields: FormField[]; }' is not assignable to parameter of type '{ name: string; description?: string | undefined; fields: any[]; processId: string; }'.
+  Property 'processId' is missing in type '{ name: any; description: any; fields: FormField[]; }' but required in type '{ name: string; description?: string | undefined; fields: any[]; processId: string; }'.
+src/components/forms/form-builder.tsx(140,31): error TS2345: Argument of type '{ name: any; description: any; fields: FormField[]; }' is not assignable to parameter of type '{ name: string; description?: string | undefined; fields: any[]; processId: string; }'.
+  Property 'processId' is missing in type '{ name: any; description: any; fields: FormField[]; }' but required in type '{ name: string; description?: string | undefined; fields: any[]; processId: string; }'.
+src/components/views/forms-view.tsx(25,35): error TS2554: Expected 1 arguments, but got 0.
+src/components/views/forms-view.tsx(145,10): error TS2741: Property 'processId' is missing in type '{ form: any; onClose: () => void; onSaved: () => Promise<void>; }' but required in type 'Props'.
+src/lib/api.ts(45,9): error TS2322: Type '{ 'Content-Type': string; } | { length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: (NumberFormatOptions & DateTimeFormatOptions) | undefined): string; ... 38 more ...; 'Content-Type': string; } | { ...; } | { ...; }' is not assignable to type 'Record<string, string>'.
+  Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions & Intl.DateTimeFormatOptions): string; pop(): [...] | undefined; ... 37 more ...; 'Content-Type': string; }' is not assignable to type 'Record<string, string>'.
+    Property 'length' is incompatible with index signature.
+      Type 'number' is not assignable to type 'string'.
+src/lib/format.ts(45,5): error TS2322: Type 'string' is not assignable to type 'T'.
+  'T' could be instantiated with an arbitrary type which could be unrelated to 'string'.
+src/lib/i18n.ts(154,3): error TS1117: An object literal cannot have multiple properties with the same name.

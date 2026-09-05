@@ -112,13 +112,32 @@ See `docs/domain-guide.md` §2 — pure service logic in `process-instances.serv
 
 ## 6. Frontend structure
 
-- `src/app/` — App Router shell (login + dashboard layout, Persian `dir="rtl"` on containers)
-- `src/components/views/` — `tasks-view`, `processes-view`, `instances-view`, `process-designer-view` (full-screen designer), `forms-view`, `categories-view`, `departments-view`, `users-view`, `task-detail-view`, `instance-detail-view`
+- `src/app/` — App Router (UI redesign Phases 2–7): public `/login` (MD3 card on indigo
+  gradient + one-click demo-account chips); authenticated `(app)` route group whose layout
+  redirects unauthenticated users to `/login` and wraps pages in `AppShell`. Routes:
+  `/dashboard`, `/tasks`(+`[id]`), `/instances`(+`[id]`), `/processes`(+`[id]/design`
+  fullscreen, ADMIN-only), `/admin/{departments,categories,users}` (ADMIN-only inline guard).
+- `src/components/shell/` — `app-shell` (top app bar + collapsible sidebar drawer⇄icon rail +
+  mobile drawer), `breadcrumbs`, `command-palette` (Ctrl+K: navigation, pending tasks,
+  start-instance, theme/logout actions)
+- `src/components/views/` — `dashboard-view` (KPI cards + recharts trends + recent lists),
+  `tasks-view`, `processes-view`, `instances-view`, `process-designer-view` (fullscreen
+  designer), `task-detail-view`, `instance-detail-view` (timeline + attachments panel),
+  `forms-view` (legacy, unrouted), `categories-view`, `departments-view`, `users-view`,
+  `login-view`. Dialogs share the MD3 pattern: 28px surface, tonal icon chip in the title row,
+  pill buttons.
 - `src/components/processes/` — `task-assignment-modal` (strategy + source-task pickers), `gateway-condition-modal` (simple/expression modes, default-flow radio), `process-preview-dialog` (read-only render + condition list + print), `process-versions-dialog` (history/preview/restore)
 - `src/components/forms/` — `form-builder` (dialog) and `form-builder-panel` (designer sidebar): field palette, properties, live preview
-- `src/components/common/` — `dynamic-form` (runtime renderer + validation), `option-select` (category-backed select), `file-upload-field`
+- `src/components/common/` — `dynamic-form` (runtime renderer + validation), `option-select` (category-backed select), `file-upload-field`, `data-table` (MUI X DataGrid wrapper — the only MUI/emotion surface, list routes only), `mui-rtl-provider` + `mui-theme`, `status-badge`, `theme-provider`/`theme-toggle` (next-themes, system default), `app-providers`, `loaders`
+- Theming (Phase 1): `globals.css` maps MD3 indigo tokens (light primary `#3B5BDB` /
+  dark `#BAC3FF`) onto shadcn CSS variable names, so every shadcn component reskins without
+  rewrites; adds `--success/--warning/--primary-container/--surface-container`, MD3 elevation
+  ramp, `state-layer`/`md-ripple`/`md-skeleton`/`md-stagger` utilities (all frozen under
+  `prefers-reduced-motion`). Print pipeline (`.process-print-area` + `:has()` rules) is
+  protected — do not refactor.
 - `src/lib/api.ts` — typed API client (`getToken/setToken`, filesApi with multipart/blob helpers)
 - `src/lib/condition-validation.ts` — browser mirror of the backend condition validator (save/activate gate)
+- `src/lib/i18n.ts` — single Persian dictionary `t` + `statusColors` (semantic token classes; RUNNING=primary / COMPLETED=success / FAILED=destructive / PENDING=warning)
 
 ## 7. Versioning architecture
 

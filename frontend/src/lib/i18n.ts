@@ -230,19 +230,79 @@ export const t = {
   readOnlyHint: 'این فیلد از داده‌های وظایف قبلی همین فرآیند پر می‌شود و قابل ویرایش نیست',
   readOnlySourceHint: 'مقدار واردشده در وظیفه قبلی',
   invalidFormTitle: 'تکمیل فرم نامعتبر است',
+
+  // Theme (UI redesign Phase 1)
+  toggleTheme: 'تغییر پوسته روشن/تاریک',
+  themeLight: 'روشن',
+  themeDark: 'تاریک',
+
+  // Shell, routing & command palette (UI redesign Phase 2)
+  dashboard: 'داشبورد',
+  taskDetail: 'جزئیات وظیفه',
+  instanceDetail: 'جزئیات نمونه',
+  searchPlaceholder: 'جستجو در سامانه…',
+  searchHint: 'برای جستجو Ctrl+K',
+  noResults: 'نتیجه‌ای یافت نشد',
+  navigationGroup: 'ناوبری',
+  myPendingTasksGroup: 'وظایف در انتظار من',
+  startInstanceGroup: 'شروع نمونه فرآیند',
+  actionsGroup: 'عملیات',
+  commandPaletteTitle: 'منوی دستورات',
+  commandPaletteDesc: 'دستور یا صفحه مورد نظر را جستجو کنید',
+  openMenu: 'باز کردن منو',
+  closeMenu: 'بستن منو',
+  expandSidebar: 'نمایش منو',
+  collapseSidebar: 'جمع کردن منو',
+  quickActions: 'دسترسی سریع',
+  quickActionsHint: 'از این‌جا شروع کنید یا از منوی کناری استفاده کنید',
+  toggleThemeAction: 'تغییر پوسته',
+  logoutAction: 'خروج از حساب',
+
+  // KPI dashboard (UI redesign Phase 3)
+  kpiPendingTasks: 'وظایف در انتظار من',
+  kpiRunningInstances: 'نمونه‌های در حال اجرا',
+  kpiActiveProcesses: 'فرآیندهای فعال',
+  kpiCompleted7d: 'تکمیل‌شده در ۷ روز اخیر',
+  chartCompletedTrend: 'روند تکمیل نمونه‌ها',
+  chartCompletedTrendHint: '۷ روز اخیر',
+  chartInstancesByStatus: 'نمونه‌ها بر اساس وضعیت',
+  recentTasks: 'آخرین وظایف',
+  recentInstances: 'آخرین نمونه‌ها',
+  viewAll: 'مشاهده همه',
+  newProcess: 'فرآیند جدید',
+  noRecentTasks: 'وظیفه‌ای برای نمایش نیست',
+  noRecentInstances: 'نمونه‌ای برای نمایش نیست',
+  dashboardLoadError: 'بارگذاری داشبورد ناموفق بود — دوباره تلاش کنید',
+  total: 'مجموع',
+
+  // Detail views + attachments (UI redesign Phase 5)
+  attachments: 'پیوست‌ها',
+  attachmentsHint: 'فایل‌های بارگذاری‌شده در وظایف این نمونه',
+  noAttachments: 'پیوستی برای این نمونه ثبت نشده است',
+  uploadedBy: 'بارگذار',
+  taskHistory: 'سابقه وظایف',
+  previousSubmissions: 'ارسال‌های قبلی',
+  viewInstance: 'مشاهده نمونه فرآیند',
+  claimFirstHint: 'برای تکمیل این وظیفه، ابتدا آن را ادعا کنید',
 };
 
+/**
+ * Status → chip classes, remapped to MD3 semantic tokens (Phase 1).
+ * RUNNING/ACTIVE = primary, COMPLETED = success, FAILED = destructive,
+ * PENDING = warning, neutral states = muted. Token-based classes adapt
+ * to both light and dark themes automatically.
+ */
 export const statusColors: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-800',
-  RUNNING: 'bg-blue-100 text-blue-800',
-  COMPLETED: 'bg-green-100 text-green-800',
-  FAILED: 'bg-red-100 text-red-800',
-  CANCELLED: 'bg-gray-100 text-gray-800',
-  TERMINATED: 'bg-gray-100 text-gray-800',
-  SKIPPED: 'bg-gray-100 text-gray-800',
-  DRAFT: 'bg-gray-100 text-gray-800',
-  ACTIVE: 'bg-green-100 text-green-800',
-  ARCHIVED: 'bg-gray-100 text-gray-800',
-  ADMIN: 'bg-purple-100 text-purple-800',
-  USER: 'bg-blue-100 text-blue-800',
+  PENDING: 'bg-warning/12 text-warning border-warning/25',
+  RUNNING: 'bg-primary/10 text-primary border-primary/30',
+  COMPLETED: 'bg-success/12 text-success border-success/30',
+  FAILED: 'bg-destructive/10 text-destructive border-destructive/30',
+  CANCELLED: 'bg-muted text-muted-foreground border-border',
+  TERMINATED: 'bg-muted text-muted-foreground border-border',
+  SKIPPED: 'bg-muted text-muted-foreground border-border',
+  DRAFT: 'bg-muted text-muted-foreground border-border',
+  ACTIVE: 'bg-success/12 text-success border-success/30',
+  ARCHIVED: 'bg-muted text-muted-foreground border-border',
+  ADMIN: 'bg-primary-container text-on-primary-container border-transparent',
+  USER: 'bg-secondary text-secondary-foreground border-transparent',
 };

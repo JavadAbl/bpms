@@ -59,48 +59,50 @@ export function FormsView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-emerald-600" />
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+            <FileText className="w-5 h-5" />
+          </span>
           <h2 className="text-2xl font-bold">{t.forms}</h2>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={load}>
             <RefreshCw className="w-4 h-4 ml-2" />
-            بروزرسانی
+            {t.refresh}
           </Button>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setEditForm(null); setShowPanel(true); }}>
+          <Button size="sm" onClick={() => { setEditForm(null); setShowPanel(true); }}>
             <Plus className="w-4 h-4 ml-2" />
             ایجاد فرم
           </Button>
         </div>
       </div>
 
-      <Card>
+      <Card className="shadow-elev-1 overflow-hidden rounded-xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
+              <thead className="border-b border-border/70 bg-muted/50">
                 <tr>
-                  <th className="text-right p-4 font-medium text-gray-600">{t.formName}</th>
-                  <th className="text-right p-4 font-medium text-gray-600">توضیحات</th>
-                  <th className="text-right p-4 font-medium text-gray-600">تعداد فیلدها</th>
-                  <th className="text-right p-4 font-medium text-gray-600">متغیرها</th>
-                  <th className="text-right p-4 font-medium text-gray-600">{t.actions}</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground text-xs">{t.formName}</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground text-xs">توضیحات</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground text-xs">تعداد فیلدها</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground text-xs">متغیرها</th>
+                  <th className="text-right p-4 font-medium text-muted-foreground text-xs">{t.actions}</th>
                 </tr>
               </thead>
               <tbody>
                 {forms.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center text-gray-500 py-8">
+                    <td colSpan={5} className="text-center text-muted-foreground py-8">
                       فرمی یافت نشد
                     </td>
                   </tr>
                 ) : (
                   forms.map((form) => (
-                    <tr key={form.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <tr key={form.id} className="border-b border-border/50 last:border-0 hover:bg-accent/60 transition-colors">
                       <td className="p-4 font-medium">{form.name}</td>
-                      <td className="p-4 text-gray-500">{form.description || '—'}</td>
+                      <td className="p-4 text-muted-foreground">{form.description || '—'}</td>
                       <td className="p-4">
-                        <Badge variant="secondary">{form.fields?.length || 0}</Badge>
+                        <Badge variant="secondary" className="rounded-full">{form.fields?.length || 0}</Badge>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1 max-w-xs">
@@ -126,7 +128,7 @@ export function FormsView() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(form.id)}
-                            className="text-red-600"
+                            className="text-destructive"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>

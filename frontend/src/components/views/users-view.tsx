@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usersApi } from '@/lib/api';
-import { t, statusColors } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,13 +22,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Plus, RefreshCw, Trash2, Edit } from 'lucide-react';
+import { DataTable } from '@/components/common/data-table';
+import type { GridColDef } from '@mui/x-data-grid';
+import { Chip, IconButton } from '@mui/material';
+import { Users, UserPlus, Pencil, Plus, RefreshCw, Trash2, Edit, Search } from 'lucide-react';
+
+const roleChipSx: Record<string, Record<string, unknown>> = {
+  ADMIN: {
+    bgcolor: 'var(--primary-container)',
+    color: 'var(--on-primary-container)',
+  },
+  USER: {
+    bgcolor: 'var(--secondary)',
+    color: 'var(--secondary-foreground)',
+  },
+};
 
 export function UsersView() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editUser, setEditUser] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -59,6 +74,91 @@ export function UsersView() {
     }
   };
 
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+      if (search) {
+        const q = search.trim();
+        if (q && !`${u.name} ${u.email}`.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [users, roleFilter, search]);
+
+  const columns: GridColDef[] = [
+    {
+      field: 'name',
+      headerName: t.userName,
+      flex: 1.2,
+      minWidth: 160,
+      renderCell: (p) => <span className="truncate font-semibold">{p.value as string}</span>,
+    },
+    {
+      field: 'email',
+      headerName: t.email,
+      flex: 1.4,
+      minWidth: 200,
+      renderCell: (p) => (
+        <span className="truncate text-muted-foreground" dir="ltr">
+          {p.value as string}
+        </span>
+      ),
+    },
+    {
+      field: 'role',
+      headerName: t.role,
+      width: 130,
+      renderCell: (p) => {
+        const role = p.row.role as string;
+        return (
+          <Chip
+            size="small"
+            label={role === 'ADMIN' ? t.ADMIN : t.USER}
+            sx={{
+              ...roleChipSx[role],
+              fontWeight: 600,
+              fontSize: 12,
+              height: 26,
+            }}
+          />
+        );
+      },
+    },
+    {
+      field: 'actions',
+      headerName: t.actions,
+      width: 110,
+      sortable: false,
+      renderCell: (p) => (
+        <span className="flex items-center gap-1">
+          <IconButton
+            size="small"
+            aria-label={t.edit}
+            title={t.edit}
+            sx={{ color: 'var(--primary)' }}
+            onClick={() => setEditUser(p.row)}
+          >
+            <Edit size={16} />
+          </IconButton>
+          <IconButton
+            size="small"
+            aria-label={t.delete}
+            title={t.delete}
+            sx={{
+              color: 'var(--destructive)',
+              '&:hover': {
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+              },
+            }}
+            onClick={() => handleDelete(p.row.id)}
+          >
+            <Trash2 size={16} />
+          </IconButton>
+        </span>
+      ),
+    },
+  ];
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -72,7 +172,7 @@ export function UsersView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Users className="w-6 h-6 text-emerald-600" />
+          <Users className="w-6 h-6 text-primary" />
           <h2 className="text-2xl font-bold">{t.users}</h2>
         </div>
         <div className="flex gap-2">
@@ -80,65 +180,45 @@ export function UsersView() {
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setShowCreate(true)}>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
             <Plus className="w-4 h-4 ml-2" />
             {t.addUser}
           </Button>
         </div>
       </div>
 
+      {/* Filter row */}
       <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
-                <tr>
-                  <th className="text-right p-4 font-medium text-gray-600">{t.userName}</th>
-                  <th className="text-right p-4 font-medium text-gray-600">{t.email}</th>
-                  <th className="text-right p-4 font-medium text-gray-600">{t.role}</th>
-                  <th className="text-right p-4 font-medium text-gray-600">{t.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="text-center text-gray-500 py-8">
-                      کاربری یافت نشد
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((u) => (
-                    <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="p-4 font-medium">{u.name}</td>
-                      <td className="p-4 text-gray-600" dir="ltr">{u.email}</td>
-                      <td className="p-4">
-                        <Badge className={statusColors[u.role]}>
-                          {u.role === 'ADMIN' ? t.ADMIN : t.USER}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setEditUser(u)}>
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(u.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        <CardContent className="p-3 flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-52">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="جستجوی نام یا ایمیل…"
+              className="ps-9"
+            />
           </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder={t.role} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t.all}</SelectItem>
+              <SelectItem value="ADMIN">{t.ADMIN}</SelectItem>
+              <SelectItem value="USER">{t.USER}</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
+
+      {/* Data grid */}
+      <DataTable
+        rows={filteredUsers}
+        columns={columns}
+        getRowId={(row) => row.id as string}
+        emptyTitle={t.noUsers}
+      />
 
       {(showCreate || editUser) && (
         <UserDialog
@@ -198,19 +278,24 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{user ? t.editUser : t.addUser}</DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+              {user ? <Pencil className="size-4.5" /> : <UserPlus className="size-4.5" />}
+            </span>
+            {user ? t.editUser : t.addUser}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>نام *</Label>
+            <Label className="font-medium">نام *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>ایمیل *</Label>
+            <Label className="font-medium">ایمیل *</Label>
             <Input value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="text-left" />
           </div>
           <div className="space-y-2">
-            <Label>رمز عبور {user ? '(اختیاری برای تغییر)' : '*'}</Label>
+            <Label className="font-medium">رمز عبور {user ? '(اختیاری برای تغییر)' : '*'}</Label>
             <Input
               type="password"
               value={password}
@@ -220,7 +305,7 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
             />
           </div>
           <div className="space-y-2">
-            <Label>نقش</Label>
+            <Label className="font-medium">نقش</Label>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger>
                 <SelectValue />
@@ -231,7 +316,7 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleSave} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'در حال ذخیره...' : 'ذخیره'}
           </Button>
         </div>

@@ -24,7 +24,12 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   const color = statusColors[status] ?? 'bg-muted text-muted-foreground';
   const label = (t as any)[status] ?? status;
   return (
-    <Badge variant="outline" className={cn(color, 'border-transparent', className)}>
+    <Badge variant="outline" className={cn(color, 'border-transparent gap-1.5', className)}>
+      {/* Animated pulse dot for in-flight work (Phase 7 micro-interaction);
+          global prefers-reduced-motion rule freezes it automatically */}
+      {status === 'RUNNING' && (
+        <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-current" />
+      )}
       {label}
     </Badge>
   );

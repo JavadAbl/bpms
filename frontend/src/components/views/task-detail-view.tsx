@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { tasksApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { t, statusColors } from '@/lib/i18n';
+import { formatPersianDate, formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +13,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { OptionSelect } from '@/components/common/option-select';
@@ -26,6 +27,13 @@ import {
   FileText,
   Lock,
   Info,
+  ClipboardList,
+  User,
+  Users,
+  CalendarDays,
+  GitBranch,
+  History,
+  ExternalLink,
 } from 'lucide-react';
 
 interface Props {
@@ -35,6 +43,7 @@ interface Props {
 
 export function TaskDetailView({ taskId, onBack }: Props) {
   const { user } = useAuth();
+  const router = useRouter();
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -83,13 +92,14 @@ export function TaskDetailView({ taskId, onBack }: Props) {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
   const handleClaim = async () => {
     setClaiming(true);
     try {
       await tasksApi.claim(taskId);
-      toast({ title: 'موفقیت', description: 'وظیفه ادعا شد' });
+      toast({ title: 'موفقیت', description: t.taskClaimed });
       await load();
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
@@ -102,7 +112,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
     setClaiming(true);
     try {
       await tasksApi.release(taskId);
-      toast({ title: 'موفقیت', description: 'وظیفه رها شد' });
+      toast({ title: 'موفقیت', description: t.taskReleased });
       await load();
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
@@ -139,7 +149,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
         if (v === undefined || v === null || v === '') delete payload[f.name];
       }
       await tasksApi.complete(taskId, payload);
-      toast({ title: 'موفقیت', description: 'وظیفه تکمیل شد' });
+      toast({ title: 'موفقیت', description: t.taskCompleted });
       onBack();
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
@@ -151,9 +161,12 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-9 w-40 rounded-full" />
+        <Skeleton className="h-28 w-full rounded-xl md-skeleton" />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <Skeleton className="h-72 w-full rounded-xl md-skeleton" />
+          <Skeleton className="h-72 w-full rounded-xl md-skeleton" />
+        </div>
       </div>
     );
   }
@@ -178,183 +191,280 @@ export function TaskDetailView({ taskId, onBack }: Props) {
       (!task.assigneeId && !task.positionId));
 
   const fields = task.form?.fields || [];
+  const instanceId: string | undefined =
+    task.processInstanceId ?? task.processInstance?.id;
+  const hasSubmissions = task.submissions && task.submissions.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Back button */}
-      <Button variant="ghost" size="sm" onClick={onBack}>
-        <ArrowRight className="w-4 h-4 ml-2" />
-        {t.back}
-      </Button>
-
-      {/* Task header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold">{task.name}</h2>
-                <Badge className={statusColors[task.status]}>
-                  {(t as any)[task.status] || task.status}
-                </Badge>
-                {task.selfService && (
-                  <Badge className="bg-orange-100 text-orange-800">{t.selfService}</Badge>
+    <div className="space-y-5">
+      {/* Back + actions row */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-mr-2">
+          <ArrowRight className="w-4 h-4 ml-1" />
+          {t.back}
+        </Button>
+        {(canClaim || canRelease) && (
+          <div className="flex items-center gap-2">
+            {canClaim && (
+              <Button onClick={handleClaim} disabled={claiming} variant="outline" size="sm">
+                {claiming ? (
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                ) : (
+                  <Hand className="w-4 h-4 ml-2" />
                 )}
-              </div>
-              {task.description && (
-                <p className="text-sm text-gray-500">{task.description}</p>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-gray-500 mb-1">{t.processName}</p>
-              <p className="font-medium">{task.processInstance?.process?.name}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 mb-1">{t.assignee}</p>
-              <p className="font-medium">{task.assignee?.name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 mb-1">{t.position}</p>
-              <p className="font-medium">{task.position?.name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 mb-1">{t.createdAt}</p>
-              <p className="font-medium">
-                {new Date(task.createdAt).toLocaleDateString('fa-IR')}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-3">
-        {canClaim && (
-          <Button onClick={handleClaim} disabled={claiming} variant="outline">
-            {claiming ? (
-              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-            ) : (
-              <Hand className="w-4 h-4 ml-2" />
+                {t.claim}
+              </Button>
             )}
-            {t.claim}
-          </Button>
-        )}
-        {canRelease && (
-          <Button onClick={handleRelease} disabled={claiming} variant="outline">
-            <XCircle className="w-4 h-4 ml-2" />
-            {t.release}
-          </Button>
+            {canRelease && (
+              <Button onClick={handleRelease} disabled={claiming} variant="outline" size="sm">
+                <XCircle className="w-4 h-4 ml-2" />
+                {t.release}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Dynamic form */}
-      {fields.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              {task.form?.name || 'فرم'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {fields.some((f: any) => f.readOnly) && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 text-blue-800 text-xs">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  مقادیر واردشده در وظایف قبلی این فرآیند به‌صورت خودکار نمایش داده می‌شوند؛ فیلدهای
-                  فقط‌خواندنی قابل ویرایش نیستند.
-                </span>
-              </div>
-            )}
-            {fields.map((field: any) => (
-              <div key={field.name} className="space-y-2">
-                <Label htmlFor={field.name} className="flex items-center gap-1.5">
-                  {field.label}
-                  {field.required && !field.readOnly && (
-                    <span className="text-red-500">*</span>
-                  )}
-                  {field.readOnly && (
-                    <Lock className="w-3 h-3 text-gray-400" />
-                  )}
-                </Label>
-                {renderField(field, formData[field.name], (val) =>
-                  setFormData({ ...formData, [field.name]: val }),
-                )}
-                {field.readOnly && (
-                  <p className="text-[11px] text-gray-400">
-                    {formData[field.name] !== undefined &&
-                    formData[field.name] !== null &&
-                    formData[field.name] !== ''
-                      ? t.readOnlySourceHint
-                      : t.readOnlyHint}
-                  </p>
+      {/* Task header — MD3 tonal banner */}
+      <Card className="border-0 shadow-elev-1 overflow-hidden">
+        <div className="bg-primary/8 dark:bg-primary/12 px-5 py-4">
+          <div className="flex items-start gap-4">
+            <div className="hidden sm:flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary-container text-on-primary-container">
+              <ClipboardList className="size-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold truncate">{task.name}</h2>
+                <Badge className={`border-transparent ${statusColors[task.status]}`}>
+                  {(t as any)[task.status] || task.status}
+                </Badge>
+                {task.selfService && (
+                  <Badge className="bg-warning/15 text-warning border-warning/25 border-transparent">
+                    {t.selfService}
+                  </Badge>
                 )}
               </div>
-            ))}
-            {canComplete ? (
-              <Button
-                onClick={handleComplete}
-                disabled={submitting}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                {submitting ? (
-                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 ml-2" />
-                )}
-                {t.complete}
-              </Button>
-            ) : task.selfService && !task.assigneeId ? (
-              <p className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">
-                برای تکمیل این وظیفه، ابتدا آن را ادعا کنید
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
+              {task.description && (
+                <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mt-4 text-sm">
+                <MetaItem icon={<GitBranch className="size-3.5" />} label={t.processName}>
+                  {task.processInstance?.process?.name}
+                </MetaItem>
+                <MetaItem icon={<User className="size-3.5" />} label={t.assignee}>
+                  {task.assignee?.name || '—'}
+                </MetaItem>
+                <MetaItem icon={<Users className="size-3.5" />} label={t.position}>
+                  {task.position?.name || '—'}
+                </MetaItem>
+                <MetaItem icon={<CalendarDays className="size-3.5" />} label={t.createdAt}>
+                  {formatPersianDateOnly(task.createdAt)}
+                </MetaItem>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
-      {/* Previous submissions */}
-      {task.submissions && task.submissions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">ارسال‌های قبلی</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {task.submissions.map((sub: any, i: number) => {
-              let parsed: Record<string, any> = {};
-              try {
-                parsed = JSON.parse(sub.data);
-              } catch {}
-              return (
-                <div key={sub.id} className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-2">
-                    {new Date(sub.submittedAt).toLocaleDateString('fa-IR')}
-                  </p>
-                  <div className="space-y-2">
-                    {Object.entries(parsed).map(([k, v]) =>
-                      looksLikeFileList(v) ? (
-                        <div key={k}>
-                          <p className="text-[11px] text-gray-400 mb-1">{k}</p>
-                          <FileUploadField value={v as any} onChange={() => {}} disabled />
-                        </div>
-                      ) : (
-                        <p key={k} className="text-sm text-gray-700" dir="auto">
-                          <span className="text-gray-400">{k}: </span>
-                          {String(v)}
-                        </p>
-                      ),
-                    )}
+      {/* Two-pane: form RIGHT (first column in RTL), metadata+history LEFT */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+        {/* ── Right pane: dynamic form ─────────────────────────────── */}
+        <div className="space-y-5">
+          {fields.length > 0 ? (
+            <Card className="shadow-elev-1">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                    <FileText className="size-4" />
+                  </span>
+                  {task.form?.name || 'فرم'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {fields.some((f: any) => f.readOnly) && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-secondary/60 text-secondary-foreground text-xs">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+                    <span>
+                      مقادیر واردشده در وظایف قبلی این فرآیند به‌صورت خودکار نمایش داده می‌شوند؛
+                      فیلدهای فقط‌خواندنی قابل ویرایش نیستند.
+                    </span>
                   </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+                )}
+                {fields.map((field: any) =>
+                  field.readOnly ? (
+                    // Read-only: tonal surface + lock, mirrors previous-task data
+                    <div
+                      key={field.name}
+                      className="rounded-xl border bg-secondary/40 border-border/70 px-3 py-2.5"
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-muted-foreground">
+                        <Lock className="w-3 h-3" />
+                        <span>{field.label}</span>
+                        {formData[field.name] !== undefined &&
+                          formData[field.name] !== null &&
+                          formData[field.name] !== '' && (
+                            <span className="text-primary/80">· {t.readOnlySourceHint}</span>
+                          )}
+                      </div>
+                      {renderField(field, formData[field.name], (val) =>
+                        setFormData({ ...formData, [field.name]: val }),
+                      )}
+                      {formData[field.name] === undefined ||
+                      formData[field.name] === null ||
+                      formData[field.name] === '' ? (
+                        <p className="text-[11px] text-muted-foreground/80 mt-1">
+                          {t.readOnlyHint}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div key={field.name} className="space-y-2">
+                      <label
+                        htmlFor={field.name}
+                        className="flex items-center gap-1.5 text-sm font-medium"
+                      >
+                        {field.label}
+                        {field.required && <span className="text-destructive">*</span>}
+                      </label>
+                      {renderField(field, formData[field.name], (val) =>
+                        setFormData({ ...formData, [field.name]: val }),
+                      )}
+                    </div>
+                  ),
+                )}
+                {canComplete ? (
+                  <div className="flex items-center gap-3 pt-1">
+                    <Button
+                      onClick={handleComplete}
+                      disabled={submitting}
+                      size="lg"
+                      className="min-w-36"
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4 ml-2" />
+                      )}
+                      {t.complete}
+                    </Button>
+                  </div>
+                ) : task.selfService && !task.assigneeId ? (
+                  <p className="text-sm text-warning bg-warning/10 p-3 rounded-lg">
+                    {t.claimFirstHint}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="shadow-elev-1">
+              <CardContent className="py-10 text-center text-muted-foreground">
+                <ClipboardList className="size-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">این وظیفه فرمی ندارد</p>
+                {canComplete && (
+                  <Button onClick={handleComplete} disabled={submitting} className="mt-4">
+                    {submitting ? (
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 ml-2" />
+                    )}
+                    {t.complete}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* ── Left pane: metadata + history ─────────────────────────── */}
+        <div className="space-y-5">
+          {/* Instance link card */}
+          {instanceId && (
+            <Card className="shadow-elev-1">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">{t.instanceInfo}</p>
+                <button
+                  onClick={() => router.push(`/instances/${instanceId}`)}
+                  className="group flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 -mx-2 text-sm font-medium text-primary hover:bg-primary/8 transition-colors"
+                >
+                  <span className="truncate">
+                    {task.processInstance?.process?.name || t.instanceDetail}
+                  </span>
+                  <ExternalLink className="size-4 shrink-0 opacity-70 group-hover:opacity-100" />
+                </button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Previous submissions */}
+          {hasSubmissions && (
+            <Card className="shadow-elev-1">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                  <History className="size-4" />
+                  {t.previousSubmissions}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {task.submissions.map((sub: any, i: number) => {
+                  let parsed: Record<string, any> = {};
+                  try {
+                    parsed = JSON.parse(sub.data);
+                  } catch {}
+                  return (
+                    <div
+                      key={sub.id}
+                      className="p-3 rounded-xl bg-muted/60 border border-border/50"
+                    >
+                      <p className="text-[11px] text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <span className="flex size-4 items-center justify-center rounded-full bg-primary/12 text-primary text-[9px] font-bold">
+                          {i + 1}
+                        </span>
+                        {formatPersianDate(sub.submittedAt)}
+                      </p>
+                      <div className="space-y-2">
+                        {Object.entries(parsed).map(([k, v]) =>
+                          looksLikeFileList(v) ? (
+                            <div key={k}>
+                              <p className="text-[11px] text-muted-foreground/80 mb-1">{k}</p>
+                              <FileUploadField value={v as any} onChange={() => {}} disabled />
+                            </div>
+                          ) : (
+                            <p key={k} className="text-sm text-foreground" dir="auto">
+                              <span className="text-muted-foreground/80">{k}: </span>
+                              {String(v)}
+                            </p>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Small icon+label metadata cell used in the header banner. */
+function MetaItem({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="flex items-center gap-1 text-muted-foreground mb-0.5 text-xs">
+        {icon}
+        {label}
+      </p>
+      <p className="font-medium truncate">{children}</p>
     </div>
   );
 }
@@ -380,6 +490,7 @@ function renderField(
   onChange: (val: any) => void,
 ) {
   const locked = !!field.readOnly;
+  const lockedCls = locked ? 'bg-transparent text-muted-foreground border-transparent px-0' : '';
   switch (field.type) {
     case 'file': {
       const fileValue = Array.isArray(value)
@@ -405,7 +516,7 @@ function renderField(
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
           disabled={locked}
-          className={locked ? 'bg-gray-50 text-gray-600' : undefined}
+          className={lockedCls}
         />
       );
     case 'number':
@@ -418,7 +529,7 @@ function renderField(
           required={field.required}
           disabled={locked}
           dir="ltr"
-          className={`text-left ${locked ? 'bg-gray-50 text-gray-600' : ''}`}
+          className={`text-left ${lockedCls}`}
         />
       );
     case 'date':
@@ -431,7 +542,7 @@ function renderField(
           required={field.required}
           disabled={locked}
           dir="ltr"
-          className={`text-left ${locked ? 'bg-gray-50 text-gray-600' : ''}`}
+          className={`text-left ${lockedCls}`}
         />
       );
     case 'select':
@@ -455,9 +566,11 @@ function renderField(
             onCheckedChange={(checked) => onChange(checked === true)}
             disabled={locked}
           />
-          <Label htmlFor={field.name} className="text-sm font-normal">
-            {field.label}
-          </Label>
+          {!locked && (
+            <Label htmlFor={field.name} className="text-sm font-normal">
+              {field.label}
+            </Label>
+          )}
         </div>
       );
     default: // text
@@ -468,7 +581,7 @@ function renderField(
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
           disabled={locked}
-          className={locked ? 'bg-gray-50 text-gray-600' : undefined}
+          className={lockedCls}
         />
       );
   }

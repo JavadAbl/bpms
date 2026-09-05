@@ -49,6 +49,7 @@ function CommandDialog({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent
+        aria-describedby={undefined}
         className={cn("overflow-hidden p-0", className)}
         showCloseButton={showCloseButton}
       >

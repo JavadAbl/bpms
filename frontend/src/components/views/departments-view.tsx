@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, RefreshCw, Trash2, ChevronDown, ChevronLeft, User, X } from 'lucide-react';
+import { Building2, Briefcase, Plus, RefreshCw, Trash2, ChevronDown, ChevronLeft, User, UserPlus, X } from 'lucide-react';
 
 export function DepartmentsView() {
   const [departments, setDepartments] = useState<any[]>([]);
@@ -104,7 +104,7 @@ export function DepartmentsView() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Building2 className="w-6 h-6 text-emerald-600" />
+          <Building2 className="w-6 h-6 text-primary" />
           <h2 className="text-2xl font-bold">{t.departments}</h2>
         </div>
         <div className="flex gap-2">
@@ -112,14 +112,14 @@ export function DepartmentsView() {
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setShowCreateDept(true)}>
+          <Button size="sm" onClick={() => setShowCreateDept(true)}>
             <Plus className="w-4 h-4 ml-2" />
             {t.addDepartment}
           </Button>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="md-stagger space-y-4">
         {departments.map((dept) => (
           <Card key={dept.id}>
             <CardContent className="p-4">
@@ -129,14 +129,14 @@ export function DepartmentsView() {
                   className="flex items-center gap-2 flex-1 text-right"
                 >
                   {expanded.has(dept.id) ? (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-muted-foreground/80" />
                   ) : (
-                    <ChevronLeft className="w-4 h-4 text-gray-400" />
+                    <ChevronLeft className="w-4 h-4 text-muted-foreground/80" />
                   )}
                   <div>
                     <p className="font-medium">{dept.name}</p>
                     {dept.description && (
-                      <p className="text-xs text-gray-500">{dept.description}</p>
+                      <p className="text-xs text-muted-foreground">{dept.description}</p>
                     )}
                   </div>
                   <Badge variant="secondary" className="mr-2">
@@ -147,16 +147,16 @@ export function DepartmentsView() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDeleteDept(dept.id)}
-                  className="text-red-600"
+                  className="text-destructive"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
 
               {expanded.has(dept.id) && (
-                <div className="mt-4 space-y-3 pr-6 border-r-2 border-gray-100">
+                <div className="mt-4 space-y-3 pr-6 border-r-2 border-border/70">
                   {(dept.positions || []).map((pos: any) => (
-                    <div key={pos.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <div key={pos.id} className="space-y-2 rounded-xl border border-border/60 bg-muted/40 p-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm">{pos.name}</p>
@@ -177,7 +177,7 @@ export function DepartmentsView() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 text-red-600"
+                            className="h-7 text-destructive"
                             onClick={() => handleDeletePos(pos.id)}
                           >
                             <Trash2 className="w-3 h-3" />
@@ -191,7 +191,7 @@ export function DepartmentsView() {
                               {up.user.name}
                               <button
                                 onClick={() => handleRemoveUser(pos.id, up.user.id)}
-                                className="mr-1 hover:text-red-600"
+                                className="mr-1 rounded-full p-0.5 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -280,18 +280,23 @@ function CreateDeptDialog({ onClose, onCreated }: { onClose: () => void; onCreat
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t.addDepartment}</DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+              <Building2 className="size-4.5" />
+            </span>
+            {t.addDepartment}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>نام *</Label>
+            <Label className="font-medium">نام *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>توضیحات</Label>
+            <Label className="font-medium">توضیحات</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <Button onClick={handleSave} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'در حال ذخیره...' : 'ایجاد'}
           </Button>
         </div>
@@ -327,18 +332,23 @@ function CreatePosDialog({ deptId, onClose, onCreated }: { deptId: string; onClo
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t.addPosition}</DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+              <Briefcase className="size-4.5" />
+            </span>
+            {t.addPosition}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>نام موقعیت *</Label>
+            <Label className="font-medium">نام موقعیت *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: مدیر مهندسی" />
           </div>
           <div className="space-y-2">
-            <Label>توضیحات</Label>
+            <Label className="font-medium">توضیحات</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <Button onClick={handleSave} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'در حال ذخیره...' : 'ایجاد'}
           </Button>
         </div>
@@ -373,11 +383,16 @@ function AssignUserDialog({ positionId, users, onClose, onAssigned }: { position
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>افزودن کاربر به موقعیت</DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+              <UserPlus className="size-4.5" />
+            </span>
+            افزودن کاربر به موقعیت
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>انتخاب کاربر</Label>
+            <Label className="font-medium">انتخاب کاربر</Label>
             <Select value={selectedUser} onValueChange={setSelectedUser}>
               <SelectTrigger>
                 <SelectValue placeholder="کاربر را انتخاب کنید" />
@@ -391,7 +406,7 @@ function AssignUserDialog({ positionId, users, onClose, onAssigned }: { position
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleAssign} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleAssign} disabled={saving} className="w-full">
             {saving ? 'در حال ذخیره...' : 'افزودن'}
           </Button>
         </div>

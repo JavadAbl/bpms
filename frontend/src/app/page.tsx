@@ -1,32 +1,9 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { AuthProvider, useAuth } from '@/lib/auth';
-import { LoginView } from '@/components/views/login-view';
-import { AppShell } from '@/components/app-shell';
-import { Skeleton } from '@/components/ui/skeleton';
-
-function AppContent() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Skeleton className="h-12 w-12 rounded-full" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginView />;
-  }
-
-  return <AppShell />;
-}
-
+/**
+ * Root entry — UI redesign Phase 2 moved all views to URL routes.
+ * The authenticated landing page is /dashboard (see src/app/(app)/).
+ */
 export default function Home() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+  redirect('/dashboard');
 }

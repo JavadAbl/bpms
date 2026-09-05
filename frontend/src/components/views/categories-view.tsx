@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { categoriesApi, type Category } from '@/lib/api';
 import { invalidateCategories, useCategories } from '@/hooks/use-categories';
 import { t } from '@/lib/i18n';
@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Search } from 'lucide-react';
 import {
   Tags,
   Plus,
@@ -40,6 +41,7 @@ export function CategoriesView() {
   const { categories, loading, reload } = useCategories();
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [search, setSearch] = useState('');
   const { toast } = useToast();
 
   // Dialog-local draft state
@@ -49,6 +51,15 @@ export function CategoriesView() {
   const [description, setDescription] = useState('');
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const filteredCategories = useMemo(() => {
+    if (!search) return categories;
+    const q = search.trim();
+    if (!q) return categories;
+    return categories.filter(
+      (c) => c.name.includes(q) || c.key.includes(q),
+    );
+  }, [categories, search]);
 
   const openCreate = () => {
     setEditing(null);
@@ -168,23 +179,38 @@ export function CategoriesView() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Tags className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Tags className="w-5 h-5 text-primary" />
             {t.categories}
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">{t.categoriesHint}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t.categoriesHint}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => reload()}>
             <RefreshCw className="w-3.5 h-3.5 ml-1" />
             {t.refresh}
           </Button>
-          <Button size="sm" onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button size="sm" onClick={openCreate} className="bg-primary hover:bg-primary/90">
             <Plus className="w-3.5 h-3.5 ml-1" />
             {t.addCategory}
           </Button>
         </div>
       </div>
+
+      {/* Filter row (card layout keeps no grid — search only, plan §5 Phase 4) */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="relative">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="جستجوی دسته‌بندی…"
+              className="ps-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* List */}
       {loading ? (
@@ -195,7 +221,7 @@ export function CategoriesView() {
         </div>
       ) : categories.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground/80">
             <Tags className="w-10 h-10 mb-3" />
             <p className="text-sm">{t.noCategories}</p>
             <Button size="sm" variant="outline" onClick={openCreate} className="mt-3">
@@ -205,28 +231,28 @@ export function CategoriesView() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {categories.map((category) => (
-            <Card key={category.id} className="group hover:shadow-md transition-shadow">
+        <div className="md-stagger grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {filteredCategories.map((category) => (
+            <Card key={category.id} className="group transition-shadow hover:shadow-elev-1">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">{category.name}</p>
-                    <code className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono" dir="ltr">
+                    <p className="font-medium text-sm text-foreground truncate">{category.name}</p>
+                    <code className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-mono" dir="ltr">
                       {category.key}
                     </code>
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openEdit(category)}
-                      className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
+                      className="rounded-full p-1.5 text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                       title={t.edit}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(category)}
-                      className="p-1.5 hover:bg-red-50 rounded text-red-500"
+                      className="rounded-full p-1.5 text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
                       title={t.delete}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -235,32 +261,32 @@ export function CategoriesView() {
                 </div>
 
                 {category.description && (
-                  <p className="text-xs text-gray-500 line-clamp-2">{category.description}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{category.description}</p>
                 )}
 
                 <div className="flex flex-wrap gap-1">
                   {category.items.length === 0 ? (
-                    <span className="text-xs text-gray-400">{t.noItems}</span>
+                    <span className="text-xs text-muted-foreground/80">{t.noItems}</span>
                   ) : (
                     category.items.map((item) => (
                       <Badge key={item.id} variant="secondary" className="text-xs font-normal">
                         {item.label}
                         {item.value !== item.label && (
-                          <span className="text-gray-400 mr-1" dir="ltr">({item.value})</span>
+                          <span className="text-muted-foreground/80 mr-1" dir="ltr">({item.value})</span>
                         )}
                       </Badge>
                     ))
                   )}
                 </div>
 
-                <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                  <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                <div className="flex items-center justify-between pt-1 border-t border-border/70">
+                  <span className="text-[11px] text-muted-foreground/80 flex items-center gap-1">
                     <Database className="w-3 h-3" />
                     {t.itemCount}: {category.items.length}
                   </span>
                   {category.usage?.formCount ? (
                     <span
-                      className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1"
+                      className="text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded-full flex items-center gap-1"
                       title={category.usage.formNames.join('، ')}
                     >
                       <FileText className="w-3 h-3" />
@@ -279,7 +305,12 @@ export function CategoriesView() {
         <Dialog open onOpenChange={setShowDialog}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
             <DialogHeader>
-              <DialogTitle>{editing ? t.editCategory : t.addCategory}</DialogTitle>
+              <DialogTitle className="flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+                  <Tags className="size-4.5" />
+                </span>
+                {editing ? t.editCategory : t.addCategory}
+              </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-3">
@@ -305,7 +336,7 @@ export function CategoriesView() {
                     dir="ltr"
                     placeholder="leave_types"
                   />
-                  <p className="text-[10px] text-gray-400">{t.categoryKeyHint}</p>
+                  <p className="text-[10px] text-muted-foreground/80">{t.categoryKeyHint}</p>
                 </div>
               </div>
 
@@ -329,14 +360,14 @@ export function CategoriesView() {
                 </div>
 
                 {items.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-3 text-center border border-dashed border-gray-200 rounded-lg">
+                  <p className="text-xs text-muted-foreground/80 py-3 text-center border border-dashed border-border rounded-lg">
                     {t.noItems}
                   </p>
                 ) : (
                   <div className="space-y-1.5">
                     {items.map((item, i) => (
                       <div key={i} className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-gray-400 w-4 text-center">{i + 1}</span>
+                        <span className="text-[10px] text-muted-foreground/80 w-4 text-center">{i + 1}</span>
                         <Input
                           value={item.value}
                           onChange={(e) => updateItem(i, { value: e.target.value })}
@@ -353,7 +384,7 @@ export function CategoriesView() {
                         <button
                           onClick={() => moveItem(i, 'up')}
                           disabled={i === 0}
-                          className="p-1 hover:bg-gray-100 rounded disabled:opacity-30"
+                          className="rounded-full p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-30"
                           title={t.moveUp}
                         >
                           <ArrowUp className="w-3 h-3" />
@@ -361,14 +392,14 @@ export function CategoriesView() {
                         <button
                           onClick={() => moveItem(i, 'down')}
                           disabled={i === items.length - 1}
-                          className="p-1 hover:bg-gray-100 rounded disabled:opacity-30"
+                          className="rounded-full p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-30"
                           title={t.moveDown}
                         >
                           <ArrowDown className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => removeItem(i)}
-                          className="p-1 hover:bg-red-50 text-red-600 rounded"
+                          className="rounded-full p-1 text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
                           title={t.delete}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -377,7 +408,7 @@ export function CategoriesView() {
                     ))}
                   </div>
                 )}
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[10px] text-muted-foreground/80">
                   مقدار (value) در داده‌های فرم و متغیرهای فرآیند ذخیره می‌شود؛ برچسب (label) به کاربر نمایش داده می‌شود.
                 </p>
               </div>
@@ -387,7 +418,7 @@ export function CategoriesView() {
               <Button variant="outline" onClick={() => setShowDialog(false)}>
                 {t.cancel}
               </Button>
-              <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button onClick={handleSave} disabled={saving}>
                 {saving ? '...' : t.save}
               </Button>
             </div>

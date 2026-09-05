@@ -112,45 +112,51 @@ export function ProcessVersionsDialog({
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <History className="w-5 h-5 text-emerald-600" />
+            <History className="w-5 h-5 text-primary" />
             تاریخچه نسخه‌ها — {processName}
           </DialogTitle>
         </DialogHeader>
-        <p className="text-xs text-gray-500 -mt-1 leading-relaxed">
+        <p className="text-xs text-muted-foreground -mt-1 leading-relaxed">
           هر ذخیره‌ای که نمودار را تغییر دهد یک نسخهٔ جدید ثبت می‌کند؛ نمونه‌های در حال اجرا روی نسخهٔ خودشان
           ادامه می‌دهند و نمونه‌های جدید با آخرین نسخه شروع می‌شوند. بازگردانی، نسخهٔ جدیدی از روی نسخهٔ قدیمی
           می‌سازد و تاریخچه دست‌نخورده باقی می‌ماند.
         </p>
 
         {error && (
-          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{error}</p>
+          <p className="text-xs text-destructive bg-destructive/10 border border-destructive/25 rounded-xl p-2.5">{error}</p>
         )}
 
         <div className="flex-1 overflow-y-auto space-y-2 py-2">
           {loading && (
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 p-4">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground p-4">
               <Loader2 className="w-4 h-4 animate-spin" />
               در حال بارگذاری...
             </div>
           )}
           {!loading && versions.length === 0 && (
-            <p className="text-sm text-gray-400 text-center p-4">نسخه‌ای ثبت نشده است</p>
+            <p className="text-sm text-muted-foreground/80 text-center p-4">نسخه‌ای ثبت نشده است</p>
           )}
           {versions.map((v) => (
-            <div key={v.id} className="border rounded-lg p-3 bg-white">
+            <div key={v.id} className="rounded-xl p-3 bg-muted/40 border border-border/60">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={v.isCurrent ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}>
+                  <Badge
+                    className={
+                      v.isCurrent
+                        ? 'bg-primary-container text-on-primary-container border-transparent'
+                        : 'bg-secondary text-secondary-foreground border-transparent'
+                    }
+                  >
                     نسخه {v.version}
                   </Badge>
                   {v.isCurrent && (
-                    <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">فعلی</Badge>
+                    <Badge className="bg-success/15 text-success border-transparent">فعلی</Badge>
                   )}
-                  <span className="text-xs text-gray-500">{fmtDate(v.createdAt)}</span>
+                  <span className="text-xs text-muted-foreground">{fmtDate(v.createdAt)}</span>
                   {v.createdBy?.name && (
-                    <span className="text-xs text-gray-400">· {v.createdBy.name}</span>
+                    <span className="text-xs text-muted-foreground/80">· {v.createdBy.name}</span>
                   )}
-                  <span className="text-[11px] text-gray-300">{(v.xmlSize / 1024).toFixed(1)} KB</span>
+                  <span className="text-[11px] text-muted-foreground/60">{(v.xmlSize / 1024).toFixed(1)} KB</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Button
@@ -184,11 +190,11 @@ export function ProcessVersionsDialog({
                 </div>
               </div>
 
-              {v.note && <p className="text-xs text-gray-600 mt-2">یادداشت: {v.note}</p>}
+              {v.note && <p className="text-xs text-muted-foreground mt-2">یادداشت: {v.note}</p>}
 
               {confirmVer === v.version && (
-                <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-md space-y-2">
-                  <p className="text-xs text-amber-800 leading-relaxed">
+                <div className="mt-2 p-2.5 bg-warning/10 border border-warning/25 rounded-xl space-y-2">
+                  <p className="text-xs text-warning leading-relaxed">
                     نسخه {v.version} به‌عنوان نسخهٔ جدید (نسخه {currentVersion + 1}) ذخیره می‌شود؛ نمودار فعلی
                     جایگزین می‌شود و هیچ نسخه‌ای از تاریخچه حذف نمی‌شود.
                   </p>
@@ -201,7 +207,7 @@ export function ProcessVersionsDialog({
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
+                      className="h-7 text-xs"
                       onClick={() => restore(v.version)}
                       disabled={restoring}
                     >
@@ -222,7 +228,7 @@ export function ProcessVersionsDialog({
               {previewVer === v.version && (
                 <pre
                   dir="ltr"
-                  className="mt-2 max-h-56 overflow-auto text-[11px] leading-relaxed bg-gray-900 text-gray-100 rounded-md p-3 font-mono whitespace-pre-wrap break-all"
+                  className="mt-2 max-h-56 overflow-auto text-[11px] leading-relaxed bg-foreground text-background rounded-xl p-3 font-mono whitespace-pre-wrap break-all"
                 >
                   {previewXml}
                 </pre>

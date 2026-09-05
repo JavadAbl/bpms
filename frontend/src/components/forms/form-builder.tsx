@@ -62,13 +62,13 @@ export interface FormField {
 }
 
 const FIELD_TYPES = [
-  { value: 'text', label: 'متن کوتاه', icon: Type, color: 'bg-blue-100 text-blue-600' },
-  { value: 'textarea', label: 'متن بلند', icon: AlignLeft, color: 'bg-purple-100 text-purple-600' },
-  { value: 'number', label: 'عدد', icon: Hash, color: 'bg-green-100 text-green-600' },
-  { value: 'date', label: 'تاریخ', icon: Calendar, color: 'bg-orange-100 text-orange-600' },
-  { value: 'select', label: 'لیست انتخاب', icon: ListChecks, color: 'bg-cyan-100 text-cyan-600' },
-  { value: 'checkbox', label: 'چک‌باکس', icon: CheckSquare, color: 'bg-pink-100 text-pink-600' },
-  { value: 'file', label: 'فایل', icon: Paperclip, color: 'bg-teal-100 text-teal-600' },
+  { value: 'text', label: 'متن کوتاه', icon: Type, color: 'bg-primary/15 text-primary' },
+  { value: 'textarea', label: 'متن بلند', icon: AlignLeft, color: 'bg-primary-container text-primary' },
+  { value: 'number', label: 'عدد', icon: Hash, color: 'bg-success/15 text-success' },
+  { value: 'date', label: 'تاریخ', icon: Calendar, color: 'bg-warning/15 text-warning' },
+  { value: 'select', label: 'لیست انتخاب', icon: ListChecks, color: 'bg-primary/15 text-primary' },
+  { value: 'checkbox', label: 'چک‌باکس', icon: CheckSquare, color: 'bg-destructive/10 text-destructive' },
+  { value: 'file', label: 'فایل', icon: Paperclip, color: 'bg-success/15 text-success' },
 ];
 
 interface FormBuilderDialogProps {
@@ -153,7 +153,7 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0" dir="rtl">
-        <DialogHeader className="p-4 border-b border-gray-200">
+        <DialogHeader className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
             <DialogTitle>{form ? 'ویرایش فرم' : 'ایجاد فرم جدید'}</DialogTitle>
             <div className="flex gap-2">
@@ -177,7 +177,7 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
           </div>
         </DialogHeader>
 
-        <div className="p-4 space-y-3 border-b border-gray-200">
+        <div className="p-4 space-y-3 border-b border-border">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">نام فرم *</Label>
@@ -192,40 +192,40 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
 
         <div className="flex" style={{ height: '420px' }}>
           {/* Left: Field Palette */}
-          <div className="w-48 border-l border-gray-200 bg-gray-50 p-3 space-y-1 overflow-y-auto">
-            <p className="text-xs font-medium text-gray-500 mb-2">انواع فیلد</p>
+          <div className="w-48 shrink-0 border-l border-border bg-muted/50 p-3 space-y-1 overflow-y-auto">
+            <p className="text-xs font-medium text-muted-foreground mb-2">انواع فیلد</p>
             {FIELD_TYPES.map((ft) => {
               const Icon = ft.icon;
               return (
                 <button
                   key={ft.value}
                   onClick={() => addField(ft.value)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-200 cursor-grab"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm text-foreground transition-all border border-transparent hover:border-primary/40 hover:bg-primary/8 hover:text-primary cursor-pointer"
                 >
-                  <span className={`w-7 h-7 rounded flex items-center justify-center ${ft.color}`}>
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ft.color}`}>
                     <Icon className="w-3.5 h-3.5" />
                   </span>
                   <span className="text-xs">{ft.label}</span>
                 </button>
               );
             })}
-            <div className="pt-3 mt-2 border-t border-gray-200">
-              <p className="text-xs text-gray-400">
+            <div className="pt-3 mt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground/80">
                 برای افزودن فیلد، روی نوع مورد نظر کلیک کنید
               </p>
             </div>
           </div>
 
           {/* Center: Canvas */}
-          <div className="flex-1 overflow-y-auto p-4 bg-white">
+          <div className="flex-1 overflow-y-auto p-4 bg-card">
             {showPreview ? (
               <PreviewForm fields={fields} />
             ) : showXml ? (
-              <pre className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg overflow-auto" dir="ltr">
+              <pre className="text-xs text-foreground bg-muted/50 p-3 rounded-lg overflow-auto" dir="ltr">
                 {JSON.stringify({ name, description, fields }, null, 2)}
               </pre>
             ) : fields.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400">
+              <div className="flex items-center justify-center h-full text-muted-foreground/80">
                 <div className="text-center">
                   <p className="text-sm">هنوز فیلدی اضافه نشده</p>
                   <p className="text-xs mt-1">از پنل سمت راست فیلد اضافه کنید</p>
@@ -237,19 +237,19 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                   <div
                     key={i}
                     onClick={() => setSelectedField(i)}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
                       selectedField === i
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-primary/60 bg-primary/8 ring-2 ring-primary/25'
+                        : 'border-border hover:bg-accent/50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-xs text-gray-400">{i + 1}.</span>
+                        <span className="text-xs text-muted-foreground/80">{i + 1}.</span>
                         <span className="font-medium text-sm">{field.label}</span>
                         {field.required && <Badge variant="destructive" className="text-xs">اجباری</Badge>}
                         {field.readOnly && (
-                          <Badge variant="secondary" className="text-xs gap-1 bg-gray-100 text-gray-600">
+                          <Badge variant="secondary" className="text-xs gap-1 bg-muted text-muted-foreground">
                             <Lock className="w-3 h-3" />
                             {t.readOnlyField}
                           </Badge>
@@ -268,19 +268,19 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                         </Badge>
                         <button
                           onClick={(e) => { e.stopPropagation(); moveField(i, 'up'); }}
-                          className="p-1 hover:bg-gray-100 rounded"
+                          className="p-1 hover:bg-accent rounded"
                         >
                           <ArrowUp className="w-3 h-3" />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); moveField(i, 'down'); }}
-                          className="p-1 hover:bg-gray-100 rounded"
+                          className="p-1 hover:bg-accent rounded"
                         >
                           <ArrowDown className="w-3 h-3" />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); removeField(i); }}
-                          className="p-1 hover:bg-red-50 text-red-600 rounded"
+                          className="p-1 hover:bg-destructive/10 text-destructive rounded"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -297,12 +297,12 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
           </div>
 
           {/* Right: Properties Panel */}
-          <div className="w-64 border-r border-gray-200 bg-gray-50 p-3 overflow-y-auto">
+          <div className="w-64 shrink-0 border-r border-border bg-muted/50 p-3 overflow-y-auto">
             {selectedFieldData ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-gray-500">ویژگی‌های فیلد</p>
-                  <button onClick={() => setSelectedField(null)} className="text-gray-400 hover:text-gray-600">
+                  <p className="text-xs font-medium text-muted-foreground">ویژگی‌های فیلد</p>
+                  <button onClick={() => setSelectedField(null)} className="text-muted-foreground/80 hover:text-muted-foreground">
                     ✕
                   </button>
                 </div>
@@ -333,7 +333,7 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                       dir="ltr"
                       placeholder="مثال: leaveType"
                     />
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground/80 mt-1">
                       این نام در شرط‌های دروازه قابل استفاده است
                     </p>
                   </div>
@@ -389,7 +389,7 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                           {categories.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
-                              <span className="font-mono text-[10px] text-gray-400 mr-1" dir="ltr">
+                              <span className="font-mono text-[10px] text-muted-foreground/80 mr-1" dir="ltr">
                                 ({c.key})
                               </span>
                             </SelectItem>
@@ -422,10 +422,10 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                           checked={!!selectedFieldData.multiple}
                           onCheckedChange={(checked) => updateField(selectedField!, 'multiple', checked === true)}
                         />
-                        <Paperclip className="w-3.5 h-3.5 text-gray-500" />
+                        <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
                         چند فایل
                       </label>
-                      <p className="text-[10px] text-gray-400 mt-1">
+                      <p className="text-[10px] text-muted-foreground/80 mt-1">
                         کاربر می‌تواند چند فایل پیوست کند؛ مقدار ذخیره‌شده فهرستی از پیوست‌هاست
                       </p>
                     </div>
@@ -444,18 +444,18 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
                       checked={!!selectedFieldData.readOnly}
                       onCheckedChange={(checked) => updateField(selectedField!, 'readOnly', checked === true)}
                     />
-                    <Lock className="w-3.5 h-3.5 text-gray-500" />
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                     {t.readOnlyField}
                   </label>
                   {selectedFieldData.readOnly && (
-                    <p className="text-[10px] text-gray-400 -mt-1">
+                    <p className="text-[10px] text-muted-foreground/80 -mt-1">
                       {t.readOnlyHint}
                     </p>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="text-center text-gray-400 mt-8">
+              <div className="text-center text-muted-foreground/80 mt-8">
                 <p className="text-xs">یک فیلد را برای ویرایش انتخاب کنید</p>
               </div>
             )}
@@ -463,9 +463,9 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+        <div className="p-4 border-t border-border flex justify-end gap-2 bg-muted/30">
           <Button variant="outline" onClick={onClose}>انصراف</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? 'در حال ذخیره...' : 'ذخیره فرم'}
           </Button>
         </div>
@@ -516,7 +516,7 @@ function CategoryOptionsPreview({ categoryId }: { categoryId: string }) {
 
   if (!category) {
     return (
-      <p className="text-[10px] text-red-500">
+      <p className="text-[10px] text-destructive">
         دسته‌بندی مرجع یافت نشد — ممکن است حذف شده باشد
       </p>
     );
@@ -524,18 +524,18 @@ function CategoryOptionsPreview({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="pt-1">
-      <p className="text-[10px] text-gray-400 mb-1">
+      <p className="text-[10px] text-muted-foreground/80 mb-1">
         گزینه‌ها از دسته‌بندی «{category.name}» خوانده می‌شود
         {category.items.length > 0 ? ` (${category.items.length} مورد)` : ''}
       </p>
       <div className="flex flex-wrap gap-1">
         {category.items.length === 0 ? (
-          <span className="text-[10px] text-gray-400">{t.noItems}</span>
+          <span className="text-[10px] text-muted-foreground/80">{t.noItems}</span>
         ) : (
           category.items.map((it) => (
             <Badge key={it.id} variant="secondary" className="text-[10px] font-normal">
               {it.label}
-              <span className="text-gray-400 mr-1" dir="ltr">({it.value})</span>
+              <span className="text-muted-foreground/80 mr-1" dir="ltr">({it.value})</span>
             </Badge>
           ))
         )}
@@ -549,12 +549,12 @@ function PreviewForm({ fields }: { fields: FormField[] }) {
 
   return (
     <div className="max-w-md mx-auto space-y-4">
-      <p className="text-sm font-medium text-gray-500 mb-4">پیش‌نمایش فرم (نحوه نمایش به کاربر)</p>
+      <p className="text-sm font-medium text-muted-foreground mb-4">پیش‌نمایش فرم (نحوه نمایش به کاربر)</p>
       {fields.map((field, i) => (
         <div key={i} className="space-y-1">
           <Label className="text-sm">
             {field.label}
-            {field.required && <span className="text-red-500 mr-1">*</span>}
+            {field.required && <span className="text-destructive mr-1">*</span>}
           </Label>
           {field.type === 'textarea' ? (
             <Textarea

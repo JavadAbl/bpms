@@ -107,6 +107,7 @@ E2E suites hit the **real API** (backend must be running on :3001):
 
 ```bash
 node scripts/test-persian-process-e2e.cjs          # seed regression: 3 leave paths
+node scripts/test-dashboard-e2e.cjs                # GET /api/dashboard KPIs (ADMIN global / USER scoped)
 node scripts/test-task-starter-assignment-e2e.cjs  # task-scoped assignment strategies (also recreates its demo process)
 node scripts/test-process-versioning-e2e.cjs       # versioning + restore + instance pinning (also recreates its demo process)
 node scripts/test-file-upload-e2e.cjs              # attachments: upload → submit → next user downloads
@@ -114,6 +115,14 @@ node scripts/test-condition-validation.cjs         # save-gate rejects broken XM
 ```
 
 All suites print `✓ PASS / ✗ FAIL` lines and exit non-zero on failure. After seed changes, re-run the seed first (`npm run prisma:seed`). Browser-check UI work with an automation agent (login → task flow), and confirm zero console errors.
+
+**UI redesign notes (post Phase 7):** MD3 indigo tokens live in `src/app/globals.css`
+(light `#3B5BDB` / dark `#BAC3FF` mapped onto shadcn variable names) with next-themes
+dark mode; shell is app bar + drawer⇄rail + Ctrl+K palette; MUI DataGrid is confined to
+list routes via `src/components/common/data-table.tsx`. `/processes/:id/design` and
+`/admin/*` are ADMIN-only (client guards); login has one-click demo-account chips.
+`tsc` baseline: `docs/tsc-baseline-phase0.txt` (18 pre-existing errors — compare sets,
+never counts). Between phases: `rm -rf .next` + restart dev (Turbopack stale-CSS).
 
 **Definition of done** (used throughout v1): E2E relevant to the touched feature passes; zero new `tsc` errors (there is a documented pre-existing baseline, see `docs/development-guide.md` §7); backend log free of new errors; UI strings Persian; `worklog.md` entry appended.
 

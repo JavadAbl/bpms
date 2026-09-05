@@ -12,6 +12,7 @@ import { ProcessesModule } from './processes/processes.module';
 import { ProcessInstancesModule } from './process-instances/process-instances.module';
 import { TasksModule } from './tasks/tasks.module';
 import { FilesModule } from './files/files.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { FilesModule } from './files/files.module';
     TasksModule,
     ProcessInstancesModule,
     FilesModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })

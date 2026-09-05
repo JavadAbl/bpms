@@ -25,6 +25,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -37,87 +38,280 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* ---- MD3 additions (Phase 1) ---- */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-surface-container: var(--surface-container);
+  --shadow-elev-1: var(--md-elev-1);
+  --shadow-elev-2: var(--md-elev-2);
+  --shadow-elev-3: var(--md-elev-3);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ============================================================
+   MD3 design tokens — Indigo classic (UI redesign Phase 1)
+   Light palette. Values per docs/ui-redesign-plan.md §3.1
+   ============================================================ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+
+  --background: #fbf9fe;
+  --foreground: #1b1b21;
+  --card: #ffffff;
+  --card-foreground: #1b1b21;
+  --popover: #ffffff;
+  --popover-foreground: #1b1b21;
+
+  --primary: #3b5bdb;
+  --primary-foreground: #ffffff;
+  --primary-container: #e1e6ff;
+  --on-primary-container: #1c2c7c;
+
+  /* shadcn `secondary` consumes MD3 secondary-container (tonal buttons/chips) */
+  --secondary: #e3e5f3;
+  --secondary-foreground: #2a2d47;
+
+  --muted: #f1eef9; /* MD3 surface-container */
+  --muted-foreground: #5a5964;
+  --accent: #e9ebfa; /* hover highlight surface */
+  --accent-foreground: #1b1b21;
+  --surface-container: #f1eef9;
+
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+  --success: #2e7d32;
+  --success-foreground: #ffffff;
+  --warning: #b26a00;
+  --warning-foreground: #ffffff;
+
+  --border: #d9d9e3;
+  --input: #c4c6d4;
+  --ring: #3b5bdb;
+
+  --chart-1: #3b5bdb;
+  --chart-2: #2e7d32;
+  --chart-3: #b26a00;
+  --chart-4: #6d5bd0;
+  --chart-5: #ba1a1a;
+
+  --sidebar: #f4f2fb;
+  --sidebar-foreground: #1b1b21;
+  --sidebar-primary: #3b5bdb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9ebfa;
+  --sidebar-accent-foreground: #1b1b21;
+  --sidebar-border: #d9d9e3;
+  --sidebar-ring: #3b5bdb;
+
+  /* MD3 elevation ramp (subtle) */
+  --md-elev-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+  --md-elev-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15);
+  --md-elev-3: 0 1px 3px rgb(0 0 0 / 0.3), 0 4px 8px 3px rgb(0 0 0 / 0.15);
 }
 
+/* ============================================================
+   MD3 dark palette — Indigo classic
+   ============================================================ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #121317;
+  --foreground: #e4e2f0;
+  --card: #1e1f26;
+  --card-foreground: #e4e2f0;
+  --popover: #1e1f26;
+  --popover-foreground: #e4e2f0;
+
+  --primary: #bac3ff;
+  --primary-foreground: #1d2874;
+  --primary-container: #3e4cad;
+  --on-primary-container: #dce1ff;
+
+  --secondary: #3f4356;
+  --secondary-foreground: #c4c9dd;
+
+  --muted: #26282f;
+  --muted-foreground: #c0c1ce;
+  --accent: #2c2e38;
+  --accent-foreground: #e4e2f0;
+  --surface-container: #26282f;
+
+  --destructive: #ffb4ab;
+  --destructive-foreground: #601410;
+  --success: #8fd694;
+  --success-foreground: #0d2b10;
+  --warning: #ffc46b;
+  --warning-foreground: #4a2800;
+
+  --border: #47464f;
+  --input: #47464f;
+  --ring: #bac3ff;
+
+  --chart-1: #bac3ff;
+  --chart-2: #8fd694;
+  --chart-3: #ffc46b;
+  --chart-4: #9e8cff;
+  --chart-5: #ffb4ab;
+
+  --sidebar: #17181d;
+  --sidebar-foreground: #e4e2f0;
+  --sidebar-primary: #bac3ff;
+  --sidebar-primary-foreground: #1d2874;
+  --sidebar-accent: #2c2e38;
+  --sidebar-accent-foreground: #e4e2f0;
+  --sidebar-border: #3b3a44;
+  --sidebar-ring: #bac3ff;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground leading-relaxed;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ============================================================
+   MD3 micro-interaction primitives (Phase 1)
+   ============================================================ */
+@layer utilities {
+  /* MD3 state layer: 8% hover / 12% press overlay tinted by currentColor */
+  .state-layer {
+    position: relative;
+  }
+  .state-layer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  .state-layer:hover::after {
+    opacity: 0.08;
+  }
+  .state-layer.state-layer-press:active::after {
+    opacity: 0.12;
+  }
+
+  /* Ripple host clips the expanding ripple circle */
+  .md-ripple-host {
+    position: relative;
+    overflow: hidden;
+  }
+  .md-ripple {
+    position: absolute;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0.18;
+    transform: scale(0);
+    pointer-events: none;
+    animation: md-ripple-in 550ms ease-out forwards;
+  }
+
+  /* Skeleton shimmer overlay */
+  .md-skeleton {
+    position: relative;
+    overflow: hidden;
+  }
+  .md-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--foreground) 8%, transparent),
+      transparent
+    );
+    animation: md-shimmer 1.6s infinite;
+  }
+}
+
+@keyframes md-ripple-in {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes md-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ============================================================
+   MD3 staggered list entrance (Phase 7 polish)
+   Apply .md-stagger to a list/grid container; direct children
+   fade-rise in sequence. The global prefers-reduced-motion rule
+   above neutralizes it for sensitive users.
+   ============================================================ */
+@keyframes md-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  .md-stagger > * {
+    animation: md-fade-up 320ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+  .md-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .md-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .md-stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .md-stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .md-stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .md-stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .md-stagger > *:nth-child(7) { animation-delay: 240ms; }
+  .md-stagger > *:nth-child(8) { animation-delay: 280ms; }
+  .md-stagger > *:nth-child(n + 9) { animation-delay: 320ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

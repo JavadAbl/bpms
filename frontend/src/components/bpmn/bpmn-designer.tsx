@@ -285,12 +285,12 @@ export function BpmnDesigner({
       selectedElement.type === 'bpmn:SequenceFlow');
 
   const paletteItems = [
-    { type: 'startEvent', label: 'شروع', icon: '○', color: 'bg-green-500' },
-    { type: 'userTask', label: 'وظیفه کاربر', icon: '☐', color: 'bg-blue-500' },
-    { type: 'exclusiveGateway', label: 'انحصاری', icon: '✕', color: 'bg-yellow-500' },
-    { type: 'parallelGateway', label: 'موازی', icon: '＋', color: 'bg-purple-500' },
-    { type: 'inclusiveGateway', label: 'فراگیر', icon: '◉', color: 'bg-orange-500' },
-    { type: 'endEvent', label: 'پایان', icon: '●', color: 'bg-red-500' },
+    { type: 'startEvent', label: 'شروع', icon: '○', color: 'bg-chart-2' },
+    { type: 'userTask', label: 'وظیفه کاربر', icon: '☐', color: 'bg-chart-1' },
+    { type: 'exclusiveGateway', label: 'انحصاری', icon: '✕', color: 'bg-chart-3' },
+    { type: 'parallelGateway', label: 'موازی', icon: '＋', color: 'bg-chart-4' },
+    { type: 'inclusiveGateway', label: 'فراگیر', icon: '◉', color: 'bg-chart-3' },
+    { type: 'endEvent', label: 'پایان', icon: '●', color: 'bg-chart-5' },
   ];
 
   // Context menu items
@@ -329,24 +329,24 @@ export function BpmnDesigner({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Palette toolbar */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-200 bg-gray-50 flex-wrap">
-        <span className="text-xs text-gray-500 ml-2">افزودن:</span>
+      {/* Palette toolbar — MD3 surface with tonal chips + pill actions */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border/70 bg-muted/40 flex-wrap">
+        <span className="text-xs font-medium text-muted-foreground ml-2">افزودن:</span>
         {paletteItems.map((item) => (
           <button
             key={item.type}
             onClick={() => createElement(item.type)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-gray-700 hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-200"
+            className="state-layer flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs text-foreground hover:bg-accent transition-colors"
             title={item.label}
           >
-            <span className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] ${item.color}`}>
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] ${item.color}`}>
               {item.icon}
             </span>
             <span className="hidden sm:inline">{item.label}</span>
           </button>
         ))}
 
-        <div className="w-px h-6 bg-gray-300 mx-1" />
+        <div className="w-px h-6 bg-border/70 mx-1" />
 
         {/* Condition button — exclusive/inclusive gateways and sequence flows */}
         <button
@@ -356,7 +356,7 @@ export function BpmnDesigner({
             }
           }}
           disabled={!selectedSupportsCondition}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-amber-700 hover:bg-amber-50 transition-all border border-transparent hover:border-amber-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="state-layer flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs text-warning hover:bg-warning/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           title="تنظیم شرط روی دروازه یا فلش انتخاب شده"
         >
           <span className="text-base leading-none">⚡</span>
@@ -366,10 +366,10 @@ export function BpmnDesigner({
         {/* Connect button */}
         <button
           onClick={startConnectMode}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-all border ${
+          className={`state-layer flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs transition-colors ${
             connectMode
-              ? 'bg-emerald-100 border-emerald-400 text-emerald-700'
-              : 'text-gray-700 hover:bg-white hover:shadow-sm border-transparent hover:border-gray-200'
+              ? 'bg-primary-container text-on-primary-container'
+              : 'text-foreground hover:bg-accent'
           }`}
           title="اتصال دو عنصر با فلش"
         >
@@ -381,7 +381,7 @@ export function BpmnDesigner({
         <button
           onClick={deleteSelected}
           disabled={!selectedElement}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-red-600 hover:bg-red-50 transition-all border border-transparent hover:border-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="state-layer flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           title="حذف عنصر انتخاب شده (Delete)"
         >
           <span className="text-base leading-none">🗑️</span>
@@ -389,18 +389,22 @@ export function BpmnDesigner({
         </button>
 
         <div className="flex-1" />
-        <span className="text-xs text-gray-400">
-          {selectedElement
-            ? `انتخاب شده: ${selectedElement.businessObject?.name || selectedElement.id}`
-            : 'برای اتصال: دکمه اتصال → کلیک روی عنصر مبدا → کلیک روی عنصر مقصد'}
-        </span>
+        {selectedElement ? (
+          <span className="inline-flex items-center max-w-[280px] h-7 px-3 rounded-full bg-secondary text-secondary-foreground text-xs">
+            <span className="truncate">انتخاب: {selectedElement.businessObject?.name || selectedElement.id}</span>
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground/80 hidden md:inline">
+            برای اتصال: دکمه اتصال → کلیک روی عنصر مبدا → کلیک روی عنصر مقصد
+          </span>
+        )}
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 relative" style={{ minHeight: '400px' }}>
+      {/* Canvas — framed MD3 surface (modeler internals untouched) */}
+      <div className="flex-1 relative m-3 rounded-xl border border-border/60 overflow-hidden shadow-elev-1" style={{ minHeight: '400px' }}>
         {!ready && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-            <p className="text-sm text-gray-400">در حال بارگذاری...</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/60 md-skeleton">
+            <p className="text-sm text-muted-foreground/80">در حال بارگذاری...</p>
           </div>
         )}
         <div
@@ -420,7 +424,7 @@ export function BpmnDesigner({
             onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
           />
           <div
-            className="fixed z-[100] bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]"
+            className="fixed z-[100] bg-card border border-border/60 rounded-xl shadow-elev-2 py-1.5 min-w-[190px] overflow-hidden"
             style={{
               left: contextMenu.x,
               top: contextMenu.y,
@@ -430,11 +434,11 @@ export function BpmnDesigner({
           >
             {contextMenuItems.map((item, i) => (
               <div key={i}>
-                {item.danger && i > 0 && <div className="my-1 border-t border-gray-100" />}
+                {item.danger && i > 0 && <div className="my-1.5 border-t border-border/60" />}
                 <button
                   onClick={item.action}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${
-                    item.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'
+                  className={`state-layer w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                    item.danger ? 'text-destructive' : 'text-foreground hover:bg-accent'
                   }`}
                 >
                   <span className="text-base">{item.icon}</span>

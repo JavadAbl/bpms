@@ -304,9 +304,10 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   }
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col" dir="rtl">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-3">
+    <div className="fixed inset-0 bg-background z-50 flex flex-col" dir="rtl">
+      {/* MD3 top app bar — elevated surface, tonal version chip, pill actions */}
+      <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border/70 bg-card shadow-elev-1 z-10">
+        <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowRight className="w-4 h-4 ml-2" />
             بازگشت
@@ -316,42 +317,41 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="نام فرآیند"
-            className="w-64 h-9"
+            className="w-64 h-9 bg-muted/60 border-border/60 focus-visible:bg-card"
           />
           {status === 'ACTIVE' && (
-            <Badge className="bg-green-100 text-green-800">فعال</Badge>
+            <Badge className="bg-success/15 text-success border-transparent">فعال</Badge>
           )}
           {status === 'DRAFT' && (
-            <Badge className="bg-gray-100 text-gray-600">پیش‌نویس</Badge>
+            <Badge className="bg-muted text-muted-foreground border-transparent">پیش‌نویس</Badge>
           )}
-          <Badge
-            variant="outline"
-            className="border-emerald-200 text-emerald-700 bg-emerald-50 cursor-pointer hover:bg-emerald-100"
+          <button
             onClick={() => currentProcessId && setVersionsOpen(true)}
             title="تاریخچه نسخه‌ها"
+            className="state-layer inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-primary-container text-on-primary-container text-xs font-medium cursor-pointer transition-shadow hover:shadow-elev-1"
           >
+            <History className="w-3.5 h-3.5" />
             نسخه {processVersion}
-          </Badge>
+          </button>
         </div>
         <div className="flex items-center gap-2">
-          {currentProcessId && (
-            <Button variant="outline" size="sm" onClick={() => setVersionsOpen(true)}>
-              <History className="w-4 h-4 ml-2" />
-              نسخه‌ها
-            </Button>
-          )}
           {currentProcessId && status === 'DRAFT' && (
-            <Button variant="outline" size="sm" onClick={handleActivate}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleActivate}
+              className="border-success/40 text-success hover:bg-success/10 hover:text-success"
+            >
               <Play className="w-4 h-4 ml-2" />
               فعال‌سازی
             </Button>
           )}
-          <Button size="sm" onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button size="sm" onClick={handleSave} disabled={saving}>
             <Save className="w-4 h-4 ml-2" />
             {saving ? 'در حال ذخیره...' : 'ذخیره'}
           </Button>
         </div>
-      </div>
+      </header>
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
@@ -364,14 +364,15 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           />
         </div>
 
-        <div className="w-80 border-r border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
-          <div className="flex border-b border-gray-200 bg-white">
+        <div className="w-80 border-r border-border/70 bg-muted/40 flex flex-col overflow-hidden">
+          {/* MD3 pill tabs */}
+          <div className="flex items-center gap-1 p-2 border-b border-border/70 bg-card">
             <button
               onClick={() => setActiveTab('forms')}
-              className={`flex-1 px-3 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 ${
+              className={`state-layer flex-1 h-8 px-3 rounded-full text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
                 activeTab === 'forms'
-                  ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-primary-container text-on-primary-container'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -379,10 +380,10 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             </button>
             <button
               onClick={() => setActiveTab('variables')}
-              className={`flex-1 px-3 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 ${
+              className={`state-layer flex-1 h-8 px-3 rounded-full text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
                 activeTab === 'variables'
-                  ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-primary-container text-on-primary-container'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Variable className="w-3.5 h-3.5" />
@@ -492,25 +493,30 @@ function FormsTab({
 }) {
   return (
     <div className="space-y-3">
-      <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700" onClick={onNewForm}>
+      <Button size="sm" className="w-full" onClick={onNewForm}>
         <Plus className="w-4 h-4 ml-2" />
         ایجاد فرم جدید
       </Button>
       {forms.length === 0 ? (
-        <p className="text-center text-gray-400 text-xs py-4">هنوز فرمی ایجاد نشده</p>
+        <div className="text-center py-6">
+          <FileText className="size-8 mx-auto mb-2 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground/80">هنوز فرمی ایجاد نشده</p>
+        </div>
       ) : (
         forms.map((form) => (
           <div
             key={form.id}
-            className="p-3 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 cursor-pointer"
+            className="p-3 bg-card rounded-xl border border-border/60 hover:border-primary/50 hover:shadow-elev-1 cursor-pointer transition-all"
             onClick={() => onEditForm(form)}
           >
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm">{form.name}</p>
-                <p className="text-xs text-gray-500">{form.fields?.length || 0} فیلد</p>
+                <p className="text-xs text-muted-foreground">{form.fields?.length || 0} فیلد</p>
               </div>
-              <Edit3 className="w-3.5 h-3.5 text-gray-400" />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Edit3 className="w-3.5 h-3.5" />
+              </span>
             </div>
             {form.fields && form.fields.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -552,12 +558,12 @@ function VariablesTab({
   }, [processVariables]);
 
   const typeColors: Record<string, string> = {
-    text: 'bg-blue-100 text-blue-700',
-    textarea: 'bg-purple-100 text-purple-700',
-    number: 'bg-green-100 text-green-700',
-    date: 'bg-orange-100 text-orange-700',
-    select: 'bg-cyan-100 text-cyan-700',
-    checkbox: 'bg-pink-100 text-pink-700',
+    text: 'bg-primary/15 text-primary',
+    textarea: 'bg-primary-container text-on-primary-container',
+    number: 'bg-success/15 text-success',
+    date: 'bg-warning/15 text-warning',
+    select: 'bg-primary/15 text-primary',
+    checkbox: 'bg-destructive/10 text-destructive',
   };
 
   const addVariable = () => {
@@ -580,8 +586,8 @@ function VariablesTab({
 
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2">
-        <p className="text-xs font-medium text-gray-600">افزودن متغیر فرآیند</p>
+      <div className="p-3 bg-card rounded-xl border border-border/60 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">افزودن متغیر فرآیند</p>
         <Input
           value={newName}
           onChange={(e) => setNewName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
@@ -607,14 +613,14 @@ function VariablesTab({
             <SelectItem value="checkbox">چک‌باکس</SelectItem>
           </SelectContent>
         </Select>
-        <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700" onClick={addVariable}>
+        <Button size="sm" className="w-full" onClick={addVariable}>
           <Plus className="w-4 h-4 ml-2" />
           افزودن
         </Button>
       </div>
 
       {vars.length === 0 && formFieldVariables.length === 0 ? (
-        <div className="text-center text-gray-400 py-4">
+        <div className="text-center text-muted-foreground/80 py-4">
           <Variable className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p className="text-xs">هنوز متغیری تعریف نشده</p>
         </div>
@@ -622,22 +628,22 @@ function VariablesTab({
         <>
           {vars.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-500">متغیرهای فرآیند</p>
+              <p className="text-xs text-muted-foreground">متغیرهای فرآیند</p>
               {vars.map((v) => (
-                <div key={v.name} className="p-2 bg-white rounded-lg border border-gray-200 flex items-center justify-between">
+                <div key={v.name} className="p-2.5 bg-card rounded-xl border border-border/60 flex items-center justify-between">
                   <div>
-                    <code className="text-xs font-mono text-gray-800" dir="ltr">
+                    <code className="text-xs font-mono text-foreground" dir="ltr">
                       {v.name}
                     </code>
-                    <p className="text-xs text-gray-500">{v.label}</p>
+                    <p className="text-xs text-muted-foreground">{v.label}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-gray-100 text-gray-600'}`}>
+                    <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-muted text-muted-foreground'}`}>
                       {v.type}
                     </Badge>
                     <button
                       onClick={() => removeVariable(v.name)}
-                      className="p-1 hover:bg-red-50 text-red-600 rounded"
+                      className="p-1 hover:bg-destructive/10 text-destructive rounded"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -649,18 +655,18 @@ function VariablesTab({
 
           {formFieldVariables.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-500">متغیرهای فرم‌ها</p>
+              <p className="text-xs text-muted-foreground">متغیرهای فرم‌ها</p>
               {formFieldVariables.map((v, i) => (
-                <div key={i} className="p-2 bg-white rounded-lg border border-gray-200">
+                <div key={i} className="p-2.5 bg-card rounded-xl border border-border/60">
                   <div className="flex items-center justify-between">
-                    <code className="text-xs font-mono text-gray-800" dir="ltr">
+                    <code className="text-xs font-mono text-foreground" dir="ltr">
                       {v.name}
                     </code>
-                    <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-gray-100 text-gray-600'}`}>
+                    <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-muted text-muted-foreground'}`}>
                       {v.type}
                     </Badge>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {v.label} — {v.formName}
                   </p>
                 </div>
@@ -669,14 +675,14 @@ function VariablesTab({
           )}
 
           {(vars.length > 0 || formFieldVariables.length > 0) && (
-            <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
+            <div className="p-3 bg-primary/8 dark:bg-primary/12 rounded-xl text-xs text-primary">
               <p className="font-medium mb-1">استفاده در شرط دروازه:</p>
               <p className="leading-5">
                 روی دروازه انحصاری راست‌کلیک کنید و «مدیریت شرط‌ها» را انتخاب کنید؛ شرط‌ها به
                 صورت <span dir="ltr" className="font-mono">next(null, …)</span> روی فلش‌های خروجی ذخیره
                 می‌شوند. نمونه عبارت:
               </p>
-              <code dir="ltr" className="text-[11px] block bg-white p-2 rounded mt-1 font-mono">
+              <code dir="ltr" className="text-[11px] block bg-card p-2 rounded-lg mt-1.5 font-mono">
                 environment.variables.{vars[0]?.name || formFieldVariables[0]?.name} === 'value'
               </code>
             </div>
