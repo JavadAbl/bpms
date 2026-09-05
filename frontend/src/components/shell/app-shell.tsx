@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { t, statusColors } from '@/lib/i18n';
+import { t, statusColors, roleLabel } from '@/lib/i18n';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +61,7 @@ function useNavItems(isAdmin: boolean) {
   return [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, show: true },
     { href: '/tasks', label: t.myTasks, icon: ClipboardList, show: true },
-    { href: '/instances', label: t.instances, icon: GitBranch, show: true },
+    { href: '/instances', label: t.instances, icon: GitBranch, show: isAdmin },
     { href: '/processes', label: t.processes, icon: Workflow, show: isAdmin },
     { href: '/admin/departments', label: t.departments, icon: Building2, show: isAdmin },
     { href: '/admin/categories', label: t.categories, icon: Tags, show: isAdmin },
@@ -182,7 +182,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             variant="secondary"
             className={`text-xs ${statusColors[user?.role || 'USER']}`}
           >
-            {user?.role === 'ADMIN' ? t.ADMIN : t.USER}
+            {roleLabel(user?.role)}
           </Badge>
         </div>
       )}
@@ -272,7 +272,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       {user?.name}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {user?.role === 'ADMIN' ? t.ADMIN : t.USER}
+                      {roleLabel(user?.role)}
                     </p>
                   </div>
                   <Avatar className="w-9 h-9">

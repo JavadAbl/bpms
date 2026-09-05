@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usersApi } from '@/lib/api';
-import { t } from '@/lib/i18n';
+import { t, roleLabel } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,10 @@ const roleChipSx: Record<string, Record<string, unknown>> = {
   ADMIN: {
     bgcolor: 'var(--primary-container)',
     color: 'var(--on-primary-container)',
+  },
+  SENIOR_EXPERT: {
+    bgcolor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+    color: 'var(--primary)',
   },
   USER: {
     bgcolor: 'var(--secondary)',
@@ -113,9 +117,9 @@ export function UsersView() {
         return (
           <Chip
             size="small"
-            label={role === 'ADMIN' ? t.ADMIN : t.USER}
+            label={roleLabel(role)}
             sx={{
-              ...roleChipSx[role],
+              ...(roleChipSx[role] || roleChipSx.USER),
               fontWeight: 600,
               fontSize: 12,
               height: 26,
@@ -206,6 +210,7 @@ export function UsersView() {
             <SelectContent>
               <SelectItem value="all">{t.all}</SelectItem>
               <SelectItem value="ADMIN">{t.ADMIN}</SelectItem>
+              <SelectItem value="SENIOR_EXPERT">{t.SENIOR_EXPERT}</SelectItem>
               <SelectItem value="USER">{t.USER}</SelectItem>
             </SelectContent>
           </Select>
@@ -311,8 +316,9 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="USER">{t.USER}</SelectItem>
                 <SelectItem value="ADMIN">{t.ADMIN}</SelectItem>
+                <SelectItem value="SENIOR_EXPERT">{t.SENIOR_EXPERT}</SelectItem>
+                <SelectItem value="USER">{t.USER}</SelectItem>
               </SelectContent>
             </Select>
           </div>

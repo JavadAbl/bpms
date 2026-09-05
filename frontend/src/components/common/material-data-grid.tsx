@@ -15,6 +15,8 @@ export interface MaterialDataGridProps {
   pageSize?: number;
   pageSizeOptions?: number[];
   emptyTitle?: string;
+  /** Minimum grid height in px (autoHeight grids collapse with few/no rows) */
+  minHeight?: number;
 }
 
 /**
@@ -37,6 +39,7 @@ export default function MaterialDataGrid({
   pageSize = 10,
   pageSizeOptions = [10, 25, 50],
   emptyTitle = 'موردی یافت نشد',
+  minHeight = 320,
 }: MaterialDataGridProps) {
   return (
     <MUIRTLProvider>
@@ -56,6 +59,10 @@ export default function MaterialDataGrid({
           disableColumnMenu
           hideFooterSelectedRowCount
           sx={{
+            // Apply the height floor only when the list is empty — with rows,
+            // autoHeight must hug the content, otherwise the root stretches
+            // and the pagination drifts away from the last row (blank gap).
+            ...(rows.length === 0 ? { minHeight } : {}),
             '& .MuiDataGrid-row': {
               cursor: onRowClick ? 'pointer' : 'default',
             },

@@ -67,6 +67,7 @@ async function bootstrap() {
   new Logger('Bootstrap').log(`📚 Swagger UI at http://localhost:${port}/api/docs`);
 
   await ensureFrontendRunning();
+  // supervisor re-run note: idempotent probe keeps frontend alive across watch restarts
 }
 
 /**

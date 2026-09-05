@@ -209,7 +209,7 @@ export function FormBuilderPanel({
     <div className="fixed inset-0 z-[60] flex" dir="rtl" onClick={onClose}>
       <div className="flex-1 bg-black/30 backdrop-blur-[1px]" />
       <div
-        className="w-[640px] max-w-full bg-card shadow-elev-3 flex flex-col h-full ml-auto"
+        className="w-[900px] max-w-full bg-card shadow-elev-3 flex flex-col h-full ml-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

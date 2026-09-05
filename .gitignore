@@ -7,6 +7,7 @@ build
 **/generated/prisma
 *.db
 *.zip
+*.tar
 
 tsconfig.build.tsbuildinfo
 

@@ -6,7 +6,7 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes';
  * Dark/light theme provider (UI redesign Phase 1).
  * - class strategy: adds `.dark` to <html> (globals.css token blocks)
  * - persisted in localStorage by next-themes
- * - default: follow system
+ * - default: light (users can still switch via the theme toggle)
  */
 export function ThemeProvider({
   children,
@@ -15,7 +15,7 @@ export function ThemeProvider({
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
+      defaultTheme="light"
       enableSystem
       disableTransitionOnChange
       {...props}

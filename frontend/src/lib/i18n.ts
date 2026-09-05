@@ -7,8 +7,8 @@ export const t = {
   appShort: 'BPMS',
   
   // Navigation
-  myTasks: 'وظایف من',
-  instances: 'نمونه‌های فرآیند',
+  myTasks: 'کارتابل',
+  instances: 'بایگانی فرآیندها',
   processes: 'تعریف فرآیندها',
   forms: 'فرم‌ها',
   departments: 'دپارتمان‌ها',
@@ -86,7 +86,8 @@ export const t = {
   
   // Roles
   ADMIN: 'مدیر',
-  USER: 'کاربر',
+  SENIOR_EXPERT: 'کارشناس ارشد',
+  USER: 'کارشناس',
   
   // Common
   save: 'ذخیره',
@@ -304,5 +305,19 @@ export const statusColors: Record<string, string> = {
   ACTIVE: 'bg-success/12 text-success border-success/30',
   ARCHIVED: 'bg-muted text-muted-foreground border-border',
   ADMIN: 'bg-primary-container text-on-primary-container border-transparent',
+  SENIOR_EXPERT: 'bg-primary/10 text-primary border-primary/30',
   USER: 'bg-secondary text-secondary-foreground border-transparent',
 };
+
+/**
+ * Persian label for a user role value (ADMIN / SENIOR_EXPERT / USER).
+ * Falls back to the plain expert label for unknown/legacy values.
+ */
+export const roleLabels: Record<string, string> = {
+  ADMIN: t.ADMIN,
+  SENIOR_EXPERT: t.SENIOR_EXPERT,
+  USER: t.USER,
+};
+
+export const roleLabel = (role?: string | null): string =>
+  (role && roleLabels[role]) || t.USER;

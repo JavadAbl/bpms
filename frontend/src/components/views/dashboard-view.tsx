@@ -569,18 +569,20 @@ export function DashboardView({
               </CardContent>
             </Card>
           </Link>
-          <Link href="/instances">
-            <Card className="state-layer h-full transition-shadow hover:shadow-elev-2">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-warning/15 text-warning">
-                  <GitBranch className="w-5 h-5" />
-                </div>
-                <span className="font-medium flex-1 min-w-0 truncate">{t.instances}</span>
-                <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />
-              </CardContent>
-            </Card>
-          </Link>
           {isAdmin ? (
+            <Link href="/instances">
+              <Card className="state-layer h-full transition-shadow hover:shadow-elev-2">
+                <CardContent className="p-5 flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-warning/15 text-warning">
+                    <GitBranch className="w-5 h-5" />
+                  </div>
+                  <span className="font-medium flex-1 min-w-0 truncate">{t.instances}</span>
+                  <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          ) : null}
+        {isAdmin ? (
             <Link href="/processes/new/design">
               <Card className="state-layer h-full transition-shadow hover:shadow-elev-2">
                 <CardContent className="p-5 flex items-center gap-4">

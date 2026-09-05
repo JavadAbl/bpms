@@ -4,6 +4,7 @@ import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validato
 
 export enum UserRole {
   ADMIN = 'ADMIN',
+  SENIOR_EXPERT = 'SENIOR_EXPERT',
   USER = 'USER',
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { processInstancesApi, processesApi } from '@/lib/api';
+import { processInstancesApi, processesApi, tasksApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -136,13 +136,31 @@ export function InstancesView({ onViewInstance }: Props) {
     if (!selectedProcess) return;
     setStarting(true);
     try {
-      await processInstancesApi.start(selectedProcess);
+      const inst = await processInstancesApi.start(selectedProcess);
       toast({ title: 'موفقیت', description: 'نمونه فرآیند شروع شد' });
       setShowStart(false);
       setSelectedProcess('');
-      await load();
+      // Go straight to the process form: the backend has already created the
+      // first task (waitForFirstTask), so if any active step of this instance
+      // is visible to the current user (assignee or unclaimed position pool),
+      // open its form immediately. Otherwise fall back to the instance detail.
+      let firstActive: any = null;
+      try {
+        const mine = await tasksApi.mine();
+        firstActive = (mine as any[])
+          .filter((tk) => tk.processInstance?.id === inst?.id)
+          .find((tk) => tk.status === 'PENDING');
+      } catch {
+        // visibility lookup is best-effort — fall back below
+      }
+      if (firstActive) {
+        router.push(`/tasks/${firstActive.id}`);
+        return;
+      }
+      router.push(`/instances/${inst?.id}`);
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+      await load();
     } finally {
       setStarting(false);
     }

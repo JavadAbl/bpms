@@ -16,6 +16,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  SENIOR_EXPERT
   USER
 }
 
