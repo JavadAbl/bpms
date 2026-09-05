@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.db
+
+# env
+.env
+.env.local
+
+# prisma local db (the actual db lives at /home/z/my-project/db/custom.db)
+prisma/*.db
+prisma/*.db-journal
+
+# logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
