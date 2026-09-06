@@ -26,6 +26,7 @@ import {
   CalendarCheck,
   GitBranch,
   AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface Props {
@@ -36,15 +37,23 @@ interface Props {
 export function InstanceDetailView({ instanceId, onBack }: Props) {
   const [instance, setInstance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
+      setDenied(false);
       try {
         const data = await processInstancesApi.findOne(instanceId);
         setInstance(data);
       } catch (err: any) {
-        toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+        // کارتابل privacy: instances the user does not participate in → denied state
+        if (err?.status === 403) {
+          setDenied(true);
+        } else {
+          toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+        }
       } finally {
         setLoading(false);
       }
@@ -59,6 +68,28 @@ export function InstanceDetailView({ instanceId, onBack }: Props) {
         <Skeleton className="h-9 w-40 rounded-full" />
         <Skeleton className="h-32 w-full rounded-xl md-skeleton" />
         <Skeleton className="h-64 w-full rounded-xl md-skeleton" />
+      </div>
+    );
+  }
+
+  if (denied) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-mr-2">
+          <ArrowRight className="w-4 h-4 ml-1" />
+          {t.back}
+        </Button>
+        <Card className="shadow-elev-1">
+          <CardContent className="py-14 text-center">
+            <span className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+              <ShieldAlert className="size-7" />
+            </span>
+            <h3 className="text-lg font-bold">{t.accessDeniedTitle}</h3>
+            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+              {t.accessDeniedInstance}
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

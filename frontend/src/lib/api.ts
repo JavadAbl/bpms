@@ -59,7 +59,9 @@ async function apiFetch<T = any>(path: string, options: FetchOptions = {}): Prom
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(errorBody.message || `HTTP ${res.status}`);
+    const err = new Error(errorBody.message || `HTTP ${res.status}`);
+    (err as any).status = res.status; // let callers branch on 403/404/…
+    throw err;
   }
 
   if (res.status === 204) return undefined as T;

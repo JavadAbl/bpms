@@ -13,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { ProcessInstancesService } from './process-instances.service';
 import { StartInstanceDto } from './dto/instance.dto';
 
@@ -25,7 +26,8 @@ export class ProcessInstancesController {
   constructor(private instances: ProcessInstancesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all process instances (with tasks + startedBy)' })
+  @Roles('ADMIN')
+  @ApiOperation({ summary: '[ADMIN] Report of all started process instances (with tasks + startedBy)' })
   findAll() {
     return this.instances.findAll();
   }
@@ -37,9 +39,11 @@ export class ProcessInstancesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a process instance by id with its tasks' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.instances.findOne(id);
+  @ApiOperation({
+    summary: 'Get an instance by id — only if the caller participates in it (or ADMIN)',
+  })
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.instances.findOne(id, req.user);
   }
 
   @Post()
@@ -49,8 +53,10 @@ export class ProcessInstancesController {
   }
 
   @Post(':id/terminate')
-  @ApiOperation({ summary: 'Terminate a running process instance' })
-  terminate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.instances.terminate(id);
+  @ApiOperation({
+    summary: 'Terminate a running instance — only its starter or an ADMIN',
+  })
+  terminate(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.instances.terminate(id, req.user);
   }
 }

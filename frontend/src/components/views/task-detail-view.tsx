@@ -34,6 +34,7 @@ import {
   GitBranch,
   History,
   ExternalLink,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface Props {
@@ -46,6 +47,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   const router = useRouter();
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -53,6 +55,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
 
   const load = async () => {
     setLoading(true);
+    setDenied(false);
     try {
       const data = await tasksApi.findOne(taskId);
       setTask(data);
@@ -84,7 +87,12 @@ export function TaskDetailView({ taskId, onBack }: Props) {
       }
       setFormData(prefill);
     } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+      // کارتابل privacy: another user's task → access-denied state, not a toast
+      if (err?.status === 403) {
+        setDenied(true);
+      } else {
+        toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
@@ -167,6 +175,28 @@ export function TaskDetailView({ taskId, onBack }: Props) {
           <Skeleton className="h-72 w-full rounded-xl md-skeleton" />
           <Skeleton className="h-72 w-full rounded-xl md-skeleton" />
         </div>
+      </div>
+    );
+  }
+
+  if (denied) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-mr-2">
+          <ArrowRight className="w-4 h-4 ml-1" />
+          {t.back}
+        </Button>
+        <Card className="shadow-elev-1">
+          <CardContent className="py-14 text-center">
+            <span className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+              <ShieldAlert className="size-7" />
+            </span>
+            <h3 className="text-lg font-bold">{t.accessDeniedTitle}</h3>
+            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+              {t.accessDeniedTask}
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

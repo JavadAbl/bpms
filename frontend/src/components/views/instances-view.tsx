@@ -2,20 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { processInstancesApi, processesApi, tasksApi } from '@/lib/api';
+import { processInstancesApi, processesApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,10 +23,19 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/common/data-table';
+import { StartProcessDialog } from '@/components/processes/start-process-dialog';
 import type { GridColDef } from '@mui/x-data-grid';
 import { Chip, IconButton } from '@mui/material';
 import { Search } from 'lucide-react';
-import { GitBranch, Plus, Play, RefreshCw, Square } from 'lucide-react';
+import {
+  Activity,
+  Ban,
+  CheckCircle2,
+  GitBranch,
+  Plus,
+  RefreshCw,
+  Square,
+} from 'lucide-react';
 
 interface Props {
   onViewInstance: (id: string) => void;
@@ -87,13 +90,15 @@ function StatusChip({ status }: { status: string }) {
 }
 
 export function InstancesView({ onViewInstance }: Props) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [instances, setInstances] = useState<any[]>([]);
   const [processes, setProcesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showStart, setShowStart] = useState(false);
-  const [selectedProcess, setSelectedProcess] = useState<string>('');
-  const [starting, setStarting] = useState(false);
+  const [startProcessId, setStartProcessId] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [processFilter, setProcessFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [terminateTarget, setTerminateTarget] = useState<any>(null);
   const [terminating, setTerminating] = useState(false);
@@ -106,7 +111,7 @@ export function InstancesView({ onViewInstance }: Props) {
   useEffect(() => {
     const start = searchParams.get('start');
     if (!start) return;
-    if (start !== '1') setSelectedProcess(start);
+    if (start !== '1') setStartProcessId(start);
     setShowStart(true);
     router.replace('/instances', { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,7 +127,23 @@ export function InstancesView({ onViewInstance }: Props) {
       setInstances(insts);
       setProcesses(procs.filter((p) => p.status === 'ACTIVE'));
     } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+      // The all-instances report is ADMIN-only — non-admins following a
+      // deep-link (palette/dashboard "start process") gracefully degrade
+      // to their own instances instead of an error screen.
+      if (err?.status === 403) {
+        try {
+          const [mine, procs] = await Promise.all([
+            processInstancesApi.mine(),
+            processesApi.findAll(),
+          ]);
+          setInstances(mine);
+          setProcesses(procs.filter((p) => p.status === 'ACTIVE'));
+        } catch (e: any) {
+          toast({ title: 'خطا', description: e.message, variant: 'destructive' });
+        }
+      } else {
+        toast({ title: 'خطا', description: err.message, variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
@@ -131,40 +152,6 @@ export function InstancesView({ onViewInstance }: Props) {
   useEffect(() => {
     load();
   }, [load]);
-
-  const handleStart = async () => {
-    if (!selectedProcess) return;
-    setStarting(true);
-    try {
-      const inst = await processInstancesApi.start(selectedProcess);
-      toast({ title: 'موفقیت', description: 'نمونه فرآیند شروع شد' });
-      setShowStart(false);
-      setSelectedProcess('');
-      // Go straight to the process form: the backend has already created the
-      // first task (waitForFirstTask), so if any active step of this instance
-      // is visible to the current user (assignee or unclaimed position pool),
-      // open its form immediately. Otherwise fall back to the instance detail.
-      let firstActive: any = null;
-      try {
-        const mine = await tasksApi.mine();
-        firstActive = (mine as any[])
-          .filter((tk) => tk.processInstance?.id === inst?.id)
-          .find((tk) => tk.status === 'PENDING');
-      } catch {
-        // visibility lookup is best-effort — fall back below
-      }
-      if (firstActive) {
-        router.push(`/tasks/${firstActive.id}`);
-        return;
-      }
-      router.push(`/instances/${inst?.id}`);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-      await load();
-    } finally {
-      setStarting(false);
-    }
-  };
 
   const handleTerminate = async () => {
     if (!terminateTarget) return;
@@ -181,9 +168,32 @@ export function InstancesView({ onViewInstance }: Props) {
     }
   };
 
+  // KPI summary (admin report overview; for non-admins it reflects their own scope)
+  const kpis = useMemo(
+    () => ({
+      total: instances.length,
+      running: instances.filter((i) => i.status === 'RUNNING').length,
+      completed: instances.filter((i) => i.status === 'COMPLETED').length,
+      ended: instances.filter((i) => i.status === 'FAILED' || i.status === 'TERMINATED').length,
+    }),
+    [instances],
+  );
+
+  // Distinct processes present in the loaded scope → report filter options
+  const processOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inst of instances) {
+      if (inst.process?.id && !map.has(inst.process.id)) {
+        map.set(inst.process.id, inst.process.name);
+      }
+    }
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [instances]);
+
   const filtered = useMemo(() => {
     return instances.filter((inst) => {
       if (statusFilter !== 'all' && inst.status !== statusFilter) return false;
+      if (processFilter !== 'all' && inst.process?.id !== processFilter) return false;
       if (search) {
         const q = search.trim();
         const haystack = [
@@ -194,7 +204,7 @@ export function InstancesView({ onViewInstance }: Props) {
       }
       return true;
     });
-  }, [instances, statusFilter, search]);
+  }, [instances, statusFilter, processFilter, search]);
 
   const columns: GridColDef[] = [
     {
@@ -213,6 +223,23 @@ export function InstancesView({ onViewInstance }: Props) {
       width: 150,
       sortComparator: (a, b) => (statusOrder[a] ?? 9) - (statusOrder[b] ?? 9),
       renderCell: (p) => <StatusChip status={p.row.status} />,
+    },
+    {
+      field: 'currentStep',
+      headerName: t.currentStep,
+      flex: 1.1,
+      minWidth: 150,
+      valueGetter: (_v, row) =>
+        (row.tasks ?? [])
+          .filter((tk: any) => tk.status === 'PENDING')
+          .map((tk: any) => tk.name)
+          .join('، '),
+      renderCell: (p) =>
+        p.value ? (
+          <span className="truncate text-sm">{p.value as string}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       field: 'startedBy',
@@ -247,7 +274,7 @@ export function InstancesView({ onViewInstance }: Props) {
       width: 110,
       sortable: false,
       renderCell: (p) =>
-        p.row.status === 'RUNNING' ? (
+        p.row.status === 'RUNNING' && (isAdmin || p.row.startedById === user?.userId) ? (
           <IconButton
             size="small"
             aria-label={t.terminate}
@@ -290,49 +317,39 @@ export function InstancesView({ onViewInstance }: Props) {
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>
-          <Dialog open={showStart} onOpenChange={setShowStart}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="w-4 h-4 ml-2" />
-                {t.startInstance}
-              </Button>
-            </DialogTrigger>
-            <DialogContent aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle>{t.startInstance}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">انتخاب فرآیند</label>
-                  <Select value={selectedProcess} onValueChange={setSelectedProcess}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="فرآیند را انتخاب کنید" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {processes.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} (v{p.version})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={handleStart}
-                  disabled={!selectedProcess || starting}
-                  className="w-full"
-                >
-                  {starting ? (
-                    <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
-                  ) : (
-                    <Play className="w-4 h-4 ml-2" />
-                  )}
-                  شروع
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" onClick={() => setShowStart(true)}>
+            <Plus className="w-4 h-4 ml-2" />
+            {t.startInstance}
+          </Button>
         </div>
+      </div>
+
+      {/* KPI summary cards ------------------------------------------------ */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <ReportKpi
+          icon={<GitBranch className="w-5 h-5" />}
+          label={t.kpiAllInstances}
+          value={kpis.total}
+          tint="bg-primary-container text-on-primary-container"
+        />
+        <ReportKpi
+          icon={<Activity className="w-5 h-5" />}
+          label={t.kpiRunningInstances}
+          value={kpis.running}
+          tint="bg-warning/15 text-warning"
+        />
+        <ReportKpi
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          label={t.COMPLETED}
+          value={kpis.completed}
+          tint="bg-success/15 text-success"
+        />
+        <ReportKpi
+          icon={<Ban className="w-5 h-5" />}
+          label={t.kpiEndedInstances}
+          value={kpis.ended}
+          tint="bg-destructive/10 text-destructive"
+        />
       </div>
 
       {/* Filter row */}
@@ -347,6 +364,19 @@ export function InstancesView({ onViewInstance }: Props) {
               className="ps-9"
             />
           </div>
+          <Select value={processFilter} onValueChange={setProcessFilter}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder={t.allProcesses} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t.allProcesses}</SelectItem>
+              {processOptions.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-44">
               <SelectValue placeholder={t.status} />
@@ -371,7 +401,13 @@ export function InstancesView({ onViewInstance }: Props) {
         emptyTitle={t.noInstances}
       />
 
-      {/* Terminate confirm */}
+      {/* Start process dialog (shared with the top bar) */}
+      <StartProcessDialog
+        open={showStart}
+        onOpenChange={setShowStart}
+        initialProcessId={startProcessId}
+      />
+
       <AlertDialog
         open={!!terminateTarget}
         onOpenChange={(open) => !open && setTerminateTarget(null)}
@@ -399,5 +435,39 @@ export function InstancesView({ onViewInstance }: Props) {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/**
+ * Compact KPI card for the report overview row (total / running / completed / ended).
+ * Static by design — the dashboard owns the animated counters.
+ */
+function ReportKpi({
+  icon,
+  label,
+  value,
+  tint,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  tint: string;
+}) {
+  return (
+    <Card className="h-full">
+      <CardContent className="p-4 flex items-center gap-3">
+        <div
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tint}`}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="text-2xl font-bold tabular-nums leading-none">
+            {value.toLocaleString('fa-IR')}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1 truncate">{label}</div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

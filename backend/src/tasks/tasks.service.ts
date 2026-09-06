@@ -238,7 +238,7 @@ export class TasksService {
     return vars;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: { id: string; role?: string }) {
     const task = await this.prisma.task.findUnique({
       where: { id },
       include: {
@@ -262,6 +262,7 @@ export class TasksService {
       },
     });
     if (!task) throw new NotFoundException(`Task ${id} not found`);
+    if (user) await this.assertVisible(task, user);
     const instanceVariables = await this.getInstanceVariables(task.processInstanceId);
     return {
       ...task,
@@ -276,6 +277,38 @@ export class TasksService {
           }
         : null,
     };
+  }
+
+  /**
+   * کارتابل privacy: each user must only be able to view their own tasks.
+   * A task is visible to the caller when:
+   *  - caller is ADMIN, or
+   *  - the task is assigned to them (direct assignment or a pool task they
+   *    have claimed), or
+   *  - the task is an unclaimed position-pool task for a position they hold
+   *    (same visibility rule as findMine), or
+   *  - the task is fully open (no assignee AND no position) — such tasks have
+   *    no owner at all and must stay viewable/completable by someone.
+   */
+  private async assertVisible(
+    task: { assigneeId: string | null; positionId: string | null },
+    user: { id: string; role?: string },
+  ): Promise<void> {
+    if (user.role === 'ADMIN') return;
+    if (task.assigneeId) {
+      if (task.assigneeId === user.id) return;
+      throw new ForbiddenException('You can only view your own tasks');
+    }
+    if (!task.positionId) return; // fully open task — no owner to hide it from
+    const holdsPosition = await this.prisma.userPosition.findUnique({
+      where: {
+        userId_positionId: { userId: user.id, positionId: task.positionId },
+      },
+      select: { id: true },
+    });
+    if (!holdsPosition) {
+      throw new ForbiddenException('You can only view your own tasks');
+    }
   }
 
   /**
@@ -296,8 +329,8 @@ export class TasksService {
    *  3. Signal the BPMN engine (uses executionId from DB, not in-memory Map)
    *  4. Engine state is persisted by the listener's `wait`/`end` handler
    */
-  async complete(id: string, dto: CompleteTaskDto, userId: string) {
-    const task = await this.findOne(id);
+  async complete(id: string, dto: CompleteTaskDto, userId: string, role?: string) {
+    const task = await this.findOne(id, { id: userId, role });
 
     if (task.status !== 'PENDING') {
       throw new ForbiddenException(`Task is already ${task.status}`);
@@ -393,7 +426,7 @@ export class TasksService {
     // to the client reflects the latest state.
     await this.waitForEngineAdvance(task.processInstanceId, id);
 
-    return this.findOne(id);
+    return this.findOne(id, { id: userId, role });
   }
 
   /**
@@ -441,7 +474,7 @@ export class TasksService {
    *  - User must hold the task's position
    */
   async claim(id: string, userId: string) {
-    const task = await this.findOne(id);
+    const task = await this.findOne(id, { id: userId });
 
     if (task.status !== 'PENDING') {
       throw new ForbiddenException(`Task is already ${task.status}`);
@@ -479,7 +512,7 @@ export class TasksService {
     });
 
     this.logger.log(`Task ${id} claimed by user ${userId}`);
-    return this.findOne(id);
+    return this.findOne(id, { id: userId });
   }
 
   /**
@@ -492,7 +525,7 @@ export class TasksService {
    *  - Task must be claimed by the current user (assigneeId = userId)
    */
   async release(id: string, userId: string) {
-    const task = await this.findOne(id);
+    const task = await this.findOne(id, { id: userId });
 
     if (task.status !== 'PENDING') {
       throw new ForbiddenException(`Task is already ${task.status}`);
@@ -516,6 +549,6 @@ export class TasksService {
     });
 
     this.logger.log(`Task ${id} released back to position pool by user ${userId}`);
-    return this.findOne(id);
+    return this.findOne(id, { id: userId });
   }
 }

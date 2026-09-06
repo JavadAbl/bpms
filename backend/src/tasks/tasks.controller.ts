@@ -13,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { TasksService } from './tasks.service';
 import { CompleteTaskDto } from './dto/task.dto';
 
@@ -25,7 +26,8 @@ export class TasksController {
   constructor(private tasks: TasksService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all tasks across all instances' })
+  @Roles('ADMIN')
+  @ApiOperation({ summary: '[ADMIN] List all tasks across all instances' })
   findAll() {
     return this.tasks.findAll();
   }
@@ -37,9 +39,11 @@ export class TasksController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a task by id (includes form fields + submissions)' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tasks.findOne(id);
+  @ApiOperation({
+    summary: 'Get a task by id — only if visible in the caller\'s کارتابل (or ADMIN)',
+  })
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.tasks.findOne(id, req.user);
   }
 
   @Post(':id/complete')
@@ -49,7 +53,7 @@ export class TasksController {
     @Body() dto: CompleteTaskDto,
     @Req() req: any,
   ) {
-    return this.tasks.complete(id, dto, req.user.id);
+    return this.tasks.complete(id, dto, req.user.id, req.user.role);
   }
 
   @Post(':id/claim')

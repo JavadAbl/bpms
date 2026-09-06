@@ -159,7 +159,6 @@ model CategoryItem {
 enum ProcessStatus {
   DRAFT
   ACTIVE
-  ARCHIVED
 }
 
 model Process {

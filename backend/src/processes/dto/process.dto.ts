@@ -5,7 +5,6 @@ import { Type } from 'class-transformer';
 export enum ProcessStatus {
   DRAFT = 'DRAFT',
   ACTIVE = 'ACTIVE',
-  ARCHIVED = 'ARCHIVED',
 }
 
 export class CreateProcessDto {

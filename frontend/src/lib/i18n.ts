@@ -8,7 +8,7 @@ export const t = {
   
   // Navigation
   myTasks: 'کارتابل',
-  instances: 'بایگانی فرآیندها',
+  instances: 'گزارش فرآیندها',
   processes: 'تعریف فرآیندها',
   forms: 'فرم‌ها',
   departments: 'دپارتمان‌ها',
@@ -51,6 +51,7 @@ export const t = {
   
   // Process
   startInstance: 'شروع نمونه',
+  startProcess: 'شروع فرآیند',
   terminate: 'خاتمه',
   version: 'نسخه',
   assignments: 'تخصیص‌ها',
@@ -59,7 +60,8 @@ export const t = {
   activate: 'فعال‌سازی',
   draft: 'پیش‌نویس',
   active: 'فعال',
-  archived: 'بایگانی',
+  currentStep: 'مرحله فعلی',
+  progress: 'پیشرفت',
   
   // Forms
   formName: 'نام فرم',
@@ -122,7 +124,6 @@ export const t = {
   noAssignee: 'بدون مسئول',
   noPosition: 'بدون موقعیت',
   activateProcess: 'فعال‌سازی',
-  archiveProcess: 'بایگانی کردن',
   setAssignments: 'تنظیم تخصیص‌ها',
   selectProcess: 'انتخاب فرآیند',
   selectUser: 'انتخاب کاربر',
@@ -285,6 +286,14 @@ export const t = {
   previousSubmissions: 'ارسال‌های قبلی',
   viewInstance: 'مشاهده نمونه فرآیند',
   claimFirstHint: 'برای تکمیل این وظیفه، ابتدا آن را ادعا کنید',
+
+  // کارتابل privacy + process report (report upgrade)
+  allProcesses: 'همه فرآیندها',
+  kpiAllInstances: 'کل نمونه‌ها',
+  kpiEndedInstances: 'خاتمه‌یافته / ناکام',
+  accessDeniedTitle: 'دسترسی غیرمجاز',
+  accessDeniedTask: 'این وظیفه به شما اختصاص ندارد و در کارتابل شما قابل مشاهده نیست.',
+  accessDeniedInstance: 'این نمونه فرآیند متعلق به شما نیست و به آن دسترسی ندارید.',
 };
 
 /**
@@ -303,7 +312,6 @@ export const statusColors: Record<string, string> = {
   SKIPPED: 'bg-muted text-muted-foreground border-border',
   DRAFT: 'bg-muted text-muted-foreground border-border',
   ACTIVE: 'bg-success/12 text-success border-success/30',
-  ARCHIVED: 'bg-muted text-muted-foreground border-border',
   ADMIN: 'bg-primary-container text-on-primary-container border-transparent',
   SENIOR_EXPERT: 'bg-primary/10 text-primary border-primary/30',
   USER: 'bg-secondary text-secondary-foreground border-transparent',

@@ -1,0 +1,21 @@
+services:
+  # --- Node.js Application ---
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+    expose:
+      - "3001"
+    ports:
+      - "3001:3001" 
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+    expose:
+      - "3000"
+    ports:
+      - "3000:3000" 
+
+ 

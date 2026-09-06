@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "PORT=3001 DATABASE_URL=file:./bpms.db nest start --watch",
+    "dev": "PORT=3001 DATABASE_URL=file:/home/z/my-project/mini-services/bpms-backend/db/bpms.db node --enable-source-maps dist/main.js",
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -51,11 +51,5 @@
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
-  },
-  "allowScripts": {
-    "@prisma/client@6.19.3": true,
-    "@prisma/engines@6.19.3": true,
-    "@scarf/scarf@1.4.0": true,
-    "prisma@6.19.3": true
   }
 }

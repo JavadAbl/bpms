@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BpmnEngineService, EngineCallbacks, WaitingTaskInfo } from '../bpmn/bpmn.engine';
 import { TasksService } from '../tasks/tasks.service';
@@ -352,12 +352,23 @@ export class ProcessInstancesService implements OnModuleInit {
       include: {
         process: { select: { id: true, name: true, version: true } },
         startedBy: { select: { id: true, email: true, name: true } },
+        // Task timeline powers the report's "current step" / progress columns
+        tasks: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            createdAt: true,
+            assignee: { select: { id: true, name: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
       orderBy: { startedAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: { id: string; role?: string }) {
     const inst = await this.prisma.processInstance.findUnique({
       where: { id },
       include: {
@@ -380,7 +391,46 @@ export class ProcessInstancesService implements OnModuleInit {
       },
     });
     if (!inst) throw new NotFoundException(`Instance ${id} not found`);
+    if (user) await this.assertParticipant(inst, user);
     return inst;
+  }
+
+  /**
+   * Same privacy model as the کارتابل: an instance (and the tasks inside it)
+   * is visible to the caller only when they participate in it:
+   *  - ADMIN, or
+   *  - the user who started the instance, or
+   *  - a user with a task assigned to them on the instance, or
+   *  - a holder of a position whose pool task on this instance is unclaimed.
+   */
+  private async assertParticipant(
+    inst: { id: string; startedById: string | null },
+    user: { id: string; role?: string },
+  ): Promise<void> {
+    if (user.role === 'ADMIN') return;
+    if (inst.startedById === user.id) return;
+    const userPositions = await this.prisma.userPosition.findMany({
+      where: { userId: user.id },
+      select: { positionId: true },
+    });
+    const positionIds = userPositions.map((up) => up.positionId);
+    const participant = await this.prisma.task.findFirst({
+      where: {
+        processInstanceId: inst.id,
+        OR: [
+          { assigneeId: user.id },
+          ...(positionIds.length > 0
+            ? [{ assigneeId: null, positionId: { in: positionIds } }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (!participant) {
+      throw new ForbiddenException(
+        'You can only view process instances you participate in',
+      );
+    }
   }
 
   async findByUser(userId: string) {
@@ -437,7 +487,7 @@ export class ProcessInstancesService implements OnModuleInit {
       throw err;
     }
 
-    return this.findOne(instance.id);
+    return this.findOne(instance.id, { id: userId });
   }
 
   /**
@@ -460,8 +510,13 @@ export class ProcessInstancesService implements OnModuleInit {
     this.logger.warn(`No task created for instance ${instanceId} after 2s — process may have no user tasks`);
   }
 
-  async terminate(id: string) {
-    const inst = await this.findOne(id);
+  async terminate(id: string, user?: { id: string; role?: string }) {
+    const inst = await this.findOne(id, user);
+    if (user && user.role !== 'ADMIN' && inst.startedById !== user.id) {
+      throw new ForbiddenException(
+        'Only the user who started this instance or an admin can terminate it',
+      );
+    }
     if (inst.status !== 'RUNNING') {
       throw new BadRequestException(`Instance is not RUNNING (status=${inst.status})`);
     }
@@ -475,6 +530,6 @@ export class ProcessInstancesService implements OnModuleInit {
       },
     });
     await this.tasks.markRemainingCancelled(id);
-    return this.findOne(id);
+    return this.findOne(id, user);
   }
 }

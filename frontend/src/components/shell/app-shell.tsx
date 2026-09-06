@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { CommandPalette } from '@/components/shell/command-palette';
+import { StartProcessDialog } from '@/components/processes/start-process-dialog';
 import {
   ClipboardList,
   GitBranch,
@@ -46,6 +47,7 @@ import {
   Menu,
   PanelRight,
   PanelRightClose,
+  Play,
 } from 'lucide-react';
 
 /**
@@ -82,6 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [rail, setRail] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN';
   const navItems = useNavItems(isAdmin);
@@ -236,8 +239,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {brand}
 
-          {/* End: search, theme, user */}
+          {/* End: start process, search, theme, user */}
           <div className="ms-auto flex items-center gap-1.5">
+            {/* Start a process — available to every user from the top bar */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStartOpen(true)}
+              className="gap-1.5 rounded-full h-9 border-primary/30 text-primary hover:bg-primary/8 hover:text-primary"
+              aria-label={t.startProcess}
+              title={t.startProcess}
+            >
+              <Play className="size-4" />
+              <span className="hidden md:inline text-sm font-medium">{t.startProcess}</span>
+            </Button>
             <Button
               variant="outline"
               onClick={() => setPaletteOpen(true)}
@@ -336,6 +351,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Global command palette (Ctrl+K) */}
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+
+      {/* Global start-process dialog (top bar) */}
+      <StartProcessDialog open={startOpen} onOpenChange={setStartOpen} />
     </div>
   );
 }
