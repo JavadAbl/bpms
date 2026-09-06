@@ -24,6 +24,7 @@ import {
   BulkProcessVariablesDto,
   CreateProcessDto,
   RestoreVersionDto,
+  SetStartersDto,
   UpdateProcessDto,
 } from './dto/process.dto';
 
@@ -57,6 +58,15 @@ export class ProcessesController {
   @ApiOperation({ summary: 'List task assignments (binding task name → user/form)' })
   getAssignments(@Param('id', ParseUUIDPipe) id: string) {
     return this.processes.getAssignments(id);
+  }
+
+  @Get(':id/starters')
+  @ApiOperation({
+    summary:
+      'List the users allowed to start this process (empty = every user may start)',
+  })
+  getStarters(@Param('id', ParseUUIDPipe) id: string) {
+    return this.processes.getStarters(id);
   }
 
   @Get(':id/variables')
@@ -107,6 +117,16 @@ export class ProcessesController {
   @ApiOperation({ summary: 'Replace all task assignments for a process (admin only)' })
   setAssignments(@Param('id', ParseUUIDPipe) id: string, @Body() dto: BulkTaskAssignmentDto) {
     return this.processes.setAssignments(id, dto);
+  }
+
+  @Put(':id/starters')
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary:
+      'Replace the starter set (the START event assignment). Empty array = every user may start (admin only)',
+  })
+  setStarters(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetStartersDto) {
+    return this.processes.setStarters(id, dto);
   }
 
   @Put(':id/variables')

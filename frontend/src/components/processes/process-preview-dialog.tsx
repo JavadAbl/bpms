@@ -108,7 +108,7 @@ export function ProcessPreviewDialog({ open, processName, bpmnXml, loadingXml, o
         className="sm:max-w-3xl max-h-[90vh] overflow-y-auto process-print-dialog"
         dir="rtl"
       >
-        <DialogHeader className="flex flex-row items-center gap-2 print:hidden">
+        <DialogHeader className="flex flex-row items-center gap-2 pe-12 print:hidden">
           <DialogTitle className="flex items-center gap-2.5 text-base flex-1">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
               <GitBranch className="w-4 h-4" />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { processesApi, formsApi, positionsApi, usersApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,11 +20,13 @@ import { validateConditionXml } from '@/lib/condition-validation';
 import { BpmnDesigner, DEFAULT_BPMN_XML } from '@/components/bpmn/bpmn-designer';
 import { FormBuilderPanel } from '@/components/forms/form-builder-panel';
 import { TaskAssignmentModal } from '@/components/processes/task-assignment-modal';
+import { ProcessStartersModal } from '@/components/processes/process-starters-modal';
 import { ProcessVersionsDialog } from '@/components/processes/process-versions-dialog';
 import {
   GatewayConditionModal,
   type ConditionVariable,
 } from '@/components/processes/gateway-condition-modal';
+import { useCategories } from '@/hooks/use-categories';
 import {
   ArrowRight,
   Save,
@@ -34,6 +37,7 @@ import {
   Edit3,
   Trash2,
   History,
+  Users,
 } from 'lucide-react';
 
 interface Props {
@@ -48,6 +52,7 @@ interface FormField {
   required: boolean;
   options?: string[];
   variable?: string;
+  categoryId?: string;
 }
 
 interface ProcessVariable {
@@ -61,7 +66,12 @@ type SidebarTab = 'forms' | 'variables';
 
 export function ProcessDesignerView({ processId: initialProcessId, onBack }: Props) {
   const { toast } = useToast();
+  const router = useRouter();
+  const { categories } = useCategories();
   const [currentProcessId, setCurrentProcessId] = useState<string | undefined>(initialProcessId);
+  // "new" mode: nothing exists on the server yet — the process row is created
+  // ONLY when the user presses ذخیره inside the designer (v4 requirement).
+  const isNewMode = !currentProcessId;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
@@ -80,6 +90,11 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   const [assignments, setAssignments] = useState<Record<string, any>>({});
   const [processVariables, setProcessVariables] = useState<ProcessVariable[]>([]);
   const [activeTab, setActiveTab] = useState<SidebarTab>('forms');
+
+  // ---- process starters (شروع‌کنندگان مجاز) — staged locally, applied on Save ----
+  const [starterIds, setStarterIds] = useState<string[]>([]);
+  const [startersRestricted, setStartersRestricted] = useState(false);
+  const [startersModalOpen, setStartersModalOpen] = useState(false);
 
   const [editingForm, setEditingForm] = useState<any | null>(null);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
@@ -115,6 +130,10 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     setUsers(usersData);
     setUserTasks(userTasksData);
     setProcessVariables(variablesData);
+    // Process starters — empty list means every user may start
+    const serverStarters: string[] = (proc.starters || []).map((s: any) => s.userId);
+    setStarterIds(serverStarters);
+    setStartersRestricted(serverStarters.length > 0);
     const map: Record<string, any> = {};
     existingAssignments.forEach((a: any) => {
       map[a.taskName] = {
@@ -137,24 +156,25 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           await loadProcessData(initialProcessId);
           setCurrentProcessId(initialProcessId);
         } else {
-          const draft = await processesApi.create({
-            name: 'فرآیند جدید',
-            bpmnXml: DEFAULT_BPMN_XML,
-          });
-          if (cancelled) return;
-          setCurrentProcessId(draft.id);
-          setName(draft.name);
-          setBpmnXml(draft.bpmnXml);
-          setStatus(draft.status);
-          const [formsData, positionsData, userTasksData] = await Promise.all([
-            formsApi.findAll(draft.id),
+          // "new" mode — NOTHING is created on the server here. The process row
+          // is created only when the user presses «ذخیره» (see handleSave).
+          setName('');
+          setDescription('');
+          setBpmnXml(DEFAULT_BPMN_XML);
+          setStatus('DRAFT');
+          setProcessVersion(1);
+          setStarterIds([]);
+          setStartersRestricted(false);
+          const [positionsData, usersData] = await Promise.all([
             positionsApi.findAll(),
-            processesApi.getUserTasks(draft.id),
+            usersApi.findAll(),
           ]);
-          setForms(formsData);
+          if (cancelled) return;
           setPositions(positionsData);
-          setUserTasks(userTasksData);
+          setUsers(usersData);
+          setForms([]);
           setProcessVariables([]);
+          setAssignments({});
         }
       } catch (err: any) {
         toast({ title: 'خطا', description: err.message, variant: 'destructive' });
@@ -168,23 +188,50 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     };
   }, [initialProcessId, loadProcessData, toast]);
 
+  // Resolve the selectable options of a form field the SAME WAY the runtime
+  // dynamic-form does: a categoryId wins (global list with Persian labels),
+  // otherwise the field's inline options. This keeps the no-code condition
+  // builder in sync with what end users actually see in task forms.
+  const resolveFieldOptions = useCallback(
+    (field: FormField): { value: string; label: string }[] => {
+      if (field.categoryId) {
+        const cat = categories.find((c) => c.id === field.categoryId);
+        if (cat?.items?.length) {
+          return cat.items.map((it) => ({ value: it.value, label: it.label }));
+        }
+      }
+      return (field.options || []).map((o) => ({ value: o, label: o }));
+    },
+    [categories],
+  );
+
   const formFieldVariables = forms.flatMap((f) =>
     (f.fields || []).map((field: FormField) => ({
       name: field.variable || field.name,
       type: field.type,
       formName: f.name,
       label: field.label,
-      options: field.options,
+      options: resolveFieldOptions(field),
     })),
   );
 
-  // Merged, de-duplicated variables available to gateway conditions
+  // Merged, de-duplicated variables available to gateway conditions.
+  // A declared process variable wins on label/type, but it is ENRICHED with
+  // the selectable options of a same-named form field — so the no-code
+  // condition builder offers the same dropdown values the runtime form shows
+  // (category-backed when the field references one).
   const conditionVariables: ConditionVariable[] = (() => {
     const map = new Map<string, ConditionVariable>();
     processVariables.forEach((v) => map.set(v.name, { name: v.name, label: v.label, type: v.type }));
     formFieldVariables.forEach((v) => {
-      if (!map.has(v.name))
-        map.set(v.name, { name: v.name, label: v.label, type: v.type, options: v.options });
+      const declared = map.get(v.name);
+      if (declared) {
+        if (v.options?.length && !(declared.options?.length)) {
+          declared.options = v.options;
+        }
+        return;
+      }
+      map.set(v.name, { name: v.name, label: v.label, type: v.type, options: v.options });
     });
     return [...map.values()];
   })();
@@ -205,7 +252,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   }, []);
 
   const handleSave = async () => {
-    if (!currentProcessId || !name || !bpmnXml) {
+    if (!name || !bpmnXml) {
       toast({ title: 'خطا', description: 'نام و طراحی فرآیند الزامی است', variant: 'destructive' });
       return;
     }
@@ -223,25 +270,77 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     }
     setSaving(true);
     try {
-      const updated = await processesApi.update(currentProcessId, { name, description, bpmnXml });
-      setProcessVersion(updated.version || processVersion);
+      if (!currentProcessId) {
+        // ---- "new" mode: THIS is the only place a process row gets created ----
+        const finalStarterIds = startersRestricted ? starterIds : [];
+        if (finalStarterIds.length === 0 && startersRestricted) {
+          toast({
+            title: 'خطا',
+            description: 'اگر شروع فرآیند محدود است، حداقل یک کاربر را انتخاب کنید',
+            variant: 'destructive',
+          });
+          setSaving(false);
+          return;
+        }
+        const created = await processesApi.create({
+          name,
+          description,
+          bpmnXml,
+          starterIds: finalStarterIds,
+        });
+        setCurrentProcessId(created.id);
+        setStatus(created.status || 'DRAFT');
+        setProcessVersion(created.version || 1);
+        // Apply the staged designer state to the freshly created process
+        if (userTasks.length > 0) {
+          await processesApi.setAssignments(
+            created.id,
+            userTasks.map((ut) => ({
+              taskName: ut.name,
+              strategy: assignments[ut.name]?.strategy || 'FIXED_USER',
+              sourceTaskName: assignments[ut.name]?.sourceTaskName || undefined,
+              positionId: assignments[ut.name]?.positionId || undefined,
+              assigneeId: assignments[ut.name]?.assigneeId || undefined,
+              formId: assignments[ut.name]?.formId || undefined,
+              selfService: assignments[ut.name]?.selfService || false,
+            })),
+          );
+        }
+        if (processVariables.length > 0) {
+          await processesApi.setVariables(created.id, processVariables);
+        }
+        // Swap the URL to the real process id so a refresh keeps the designer
+        // in edit mode (same dynamic route — no remount, state preserved).
+        router.replace(`/processes/${created.id}/design`);
+        toast({ title: 'موفقیت', description: 'فرآیند ایجاد و ذخیره شد' });
+      } else {
+        // ---- edit mode: PATCH (new version row only when XML really changed) ----
+        const updated = await processesApi.update(currentProcessId, { name, description, bpmnXml });
+        setProcessVersion(updated.version || processVersion);
 
-      if (userTasks.length > 0) {
-        const assignmentList = userTasks.map((ut) => ({
-          taskName: ut.name,
-          strategy: assignments[ut.name]?.strategy || 'FIXED_USER',
-          sourceTaskName: assignments[ut.name]?.sourceTaskName || undefined,
-          positionId: assignments[ut.name]?.positionId || undefined,
-          assigneeId: assignments[ut.name]?.assigneeId || undefined,
-          formId: assignments[ut.name]?.formId || undefined,
-          selfService: assignments[ut.name]?.selfService || false,
-        }));
-        await processesApi.setAssignments(currentProcessId, assignmentList);
+        if (userTasks.length > 0) {
+          const assignmentList = userTasks.map((ut) => ({
+            taskName: ut.name,
+            strategy: assignments[ut.name]?.strategy || 'FIXED_USER',
+            sourceTaskName: assignments[ut.name]?.sourceTaskName || undefined,
+            positionId: assignments[ut.name]?.positionId || undefined,
+            assigneeId: assignments[ut.name]?.assigneeId || undefined,
+            formId: assignments[ut.name]?.formId || undefined,
+            selfService: assignments[ut.name]?.selfService || false,
+          }));
+          await processesApi.setAssignments(currentProcessId, assignmentList);
+        }
+
+        await processesApi.setVariables(currentProcessId, processVariables);
+
+        // Starters are process-level config (not versioned) — apply on save
+        await processesApi.setStarters(
+          currentProcessId,
+          startersRestricted ? starterIds : [],
+        );
+
+        toast({ title: 'موفقیت', description: 'فرآیند ذخیره شد' });
       }
-
-      await processesApi.setVariables(currentProcessId, processVariables);
-
-      toast({ title: 'موفقیت', description: 'فرآیند ذخیره شد' });
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
     } finally {
@@ -285,7 +384,11 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   };
 
   const saveProcessVariables = async (vars: ProcessVariable[]) => {
-    if (!currentProcessId) return;
+    if (!currentProcessId) {
+      // "new" mode — keep locally; applied when the process is created on Save
+      setProcessVariables(vars);
+      return;
+    }
     setProcessVariables(vars);
     try {
       await processesApi.setVariables(currentProcessId, vars);
@@ -316,23 +419,53 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="نام فرآیند"
+            placeholder="نام فرآیند (الزامی)"
             className="w-64 h-9 bg-muted/60 border-border/60 focus-visible:bg-card"
           />
-          {status === 'ACTIVE' && (
+          {isNewMode && (
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="توضیحات (اختیاری)"
+              className="w-56 h-9 bg-muted/60 border-border/60 focus-visible:bg-card hidden lg:block"
+            />
+          )}
+          {isNewMode && (
+            <Badge className="bg-primary-container text-on-primary-container border-transparent">
+              ایجاد جدید — هنوز ذخیره نشده
+            </Badge>
+          )}
+          {status === 'ACTIVE' && !isNewMode && (
             <Badge className="bg-success/15 text-success border-transparent">فعال</Badge>
           )}
-          {status === 'DRAFT' && (
+          {status === 'DRAFT' && !isNewMode && (
             <Badge className="bg-muted text-muted-foreground border-transparent">پیش‌نویس</Badge>
           )}
+          {/* Starters chip — click to edit who may start instances of this process */}
           <button
-            onClick={() => currentProcessId && setVersionsOpen(true)}
-            title="تاریخچه نسخه‌ها"
-            className="state-layer inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-primary-container text-on-primary-container text-xs font-medium cursor-pointer transition-shadow hover:shadow-elev-1"
+            onClick={() => setStartersModalOpen(true)}
+            title="تعیین کاربران مجاز به شروع فرآیند"
+            className={`state-layer inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium cursor-pointer transition-shadow hover:shadow-elev-1 ${
+              startersRestricted
+                ? 'bg-warning/15 text-warning'
+                : 'bg-muted text-muted-foreground'
+            }`}
           >
-            <History className="w-3.5 h-3.5" />
-            نسخه {processVersion}
+            <Users className="w-3.5 h-3.5" />
+            {startersRestricted
+              ? `شروع: ${starterIds.length.toLocaleString('fa-IR')} کاربر`
+              : 'شروع: همه کاربران'}
           </button>
+          {currentProcessId && (
+            <button
+              onClick={() => setVersionsOpen(true)}
+              title="تاریخچه نسخه‌ها"
+              className="state-layer inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-primary-container text-on-primary-container text-xs font-medium cursor-pointer transition-shadow hover:shadow-elev-1"
+            >
+              <History className="w-3.5 h-3.5" />
+              نسخه {processVersion}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {currentProcessId && status === 'DRAFT' && (
@@ -348,7 +481,11 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           )}
           <Button size="sm" onClick={handleSave} disabled={saving}>
             <Save className="w-4 h-4 ml-2" />
-            {saving ? 'در حال ذخیره...' : 'ذخیره'}
+            {saving
+              ? 'در حال ذخیره...'
+              : isNewMode
+                ? 'ایجاد و ذخیره'
+                : 'ذخیره'}
           </Button>
         </div>
       </header>
@@ -361,6 +498,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             initialXml={bpmnXml || undefined}
             onAssignmentAction={handleAssignmentFromContext}
             onConditionAction={handleConditionAction}
+            onStartersAction={() => setStartersModalOpen(true)}
           />
         </div>
 
@@ -395,6 +533,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             {activeTab === 'forms' && (
               <FormsTab
                 forms={forms}
+                disabled={isNewMode}
                 onEditForm={(form) => {
                   setEditingForm(form);
                   setShowFormBuilder(true);
@@ -452,6 +591,20 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         />
       )}
 
+      {startersModalOpen && (
+        <ProcessStartersModal
+          open={startersModalOpen}
+          users={users}
+          restricted={startersRestricted}
+          starterIds={starterIds}
+          onChange={(restricted, ids) => {
+            setStartersRestricted(restricted);
+            setStarterIds(ids);
+          }}
+          onClose={() => setStartersModalOpen(false)}
+        />
+      )}
+
       {conditionTarget && (
         <GatewayConditionModal
           open
@@ -484,19 +637,27 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
 
 function FormsTab({
   forms,
+  disabled,
   onEditForm,
   onNewForm,
 }: {
   forms: any[];
+  /** "new" mode: the process row does not exist yet — forms need a processId */
+  disabled?: boolean;
   onEditForm: (form: any) => void;
   onNewForm: () => void;
 }) {
   return (
     <div className="space-y-3">
-      <Button size="sm" className="w-full" onClick={onNewForm}>
+      <Button size="sm" className="w-full" onClick={onNewForm} disabled={disabled}>
         <Plus className="w-4 h-4 ml-2" />
         ایجاد فرم جدید
       </Button>
+      {disabled && (
+        <p className="text-[11px] text-warning bg-warning/10 border border-warning/25 rounded-lg px-2.5 py-2 leading-relaxed">
+          برای ساخت فرم، ابتدا فرآیند را با دکمه «ایجاد و ذخیره» ذخیره کنید.
+        </p>
+      )}
       {forms.length === 0 ? (
         <div className="text-center py-6">
           <FileText className="size-8 mx-auto mb-2 text-muted-foreground/40" />

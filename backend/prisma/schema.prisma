@@ -37,6 +37,7 @@ model User {
   userPositions      UserPosition[]
   processVersions    ProcessVersion[]    @relation("ProcessVersionCreatedBy")
   uploadedFiles      FileAttachment[]    @relation("FileUploadedBy")
+  processStarters    ProcessStarter[]    @relation("ProcessStarterUser")
 
   @@map("users")
 }
@@ -178,8 +179,28 @@ model Process {
   forms       Form[]
   variables   ProcessVariable[]
   versions    ProcessVersion[]
+  starters    ProcessStarter[]
 
   @@map("processes")
+}
+
+// ---------------------------------------------------------------------------
+// Process starters — declarative "who may start this process" (the START
+// event's assignment). An EMPTY set means every user may start (default,
+// backward compatible). A non-empty set restricts starting to those users;
+// ADMINs always may (god-mode for testing/ops). Resolved server-side in
+// ProcessInstancesService.start() — no triggers, no code.
+// ---------------------------------------------------------------------------
+model ProcessStarter {
+  id        String   @id @default(uuid())
+  processId String
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("ProcessStarterUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([processId, userId])
+  @@map("process_starters")
 }
 
 // Immutable version history — every save that actually CHANGES the BPMN XML

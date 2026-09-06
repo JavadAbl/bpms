@@ -9,6 +9,7 @@ import {
   BulkTaskAssignmentDto,
   BulkProcessVariablesDto,
   CreateProcessDto,
+  SetStartersDto,
   TaskAssignmentDto,
   UpdateProcessDto,
 } from './dto/process.dto';
@@ -20,9 +21,19 @@ export class ProcessesService {
     private bpmn: BpmnEngineService,
   ) {}
 
+  /** Shared include: starters carry the user info the pickers need */
+  private readonly startersInclude = {
+    starters: {
+      orderBy: { createdAt: 'asc' as const },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    },
+  };
+
   async findAll() {
     const processes = await this.prisma.process.findMany({
-      include: { assignments: true },
+      include: { assignments: true, ...this.startersInclude },
       orderBy: { createdAt: 'desc' },
     });
     return processes.map((p) => this.serialize(p));
@@ -31,7 +42,9 @@ export class ProcessesService {
   async findOne(id: string, includeAssignments = true) {
     const process = await this.prisma.process.findUnique({
       where: { id },
-      include: includeAssignments ? { assignments: true } : undefined,
+      include: includeAssignments
+        ? { assignments: true, ...this.startersInclude }
+        : this.startersInclude,
     });
     if (!process) throw new NotFoundException(`Process ${id} not found`);
     return this.serialize(process);
@@ -52,6 +65,38 @@ export class ProcessesService {
       // Not strictly an error (could be all automated), but for BPMS MVP it's suspicious
       // We just warn via the response, not reject.
     }
+    // Starter restriction (START event assignment): validate users exist, then
+    // create the ProcessStarter rows alongside the process.
+    if (dto.starterIds?.length) {
+      const uniqueStarters = [...new Set(dto.starterIds)];
+      const found = await this.prisma.user.findMany({
+        where: { id: { in: uniqueStarters } },
+        select: { id: true },
+      });
+      if (found.length !== uniqueStarters.length) {
+        throw new BadRequestException(
+          'starterIds contains unknown user ids',
+        );
+      }
+      const process = await this.prisma.process.create({
+        data: {
+          name: dto.name,
+          description: dto.description,
+          bpmnXml: dto.bpmnXml,
+          status: 'DRAFT',
+          createdById: userId,
+          // First immutable history row (v1) — see ProcessVersion in schema
+          versions: {
+            create: { version: 1, bpmnXml: dto.bpmnXml, createdById: userId },
+          },
+          starters: {
+            create: uniqueStarters.map((uid) => ({ userId: uid })),
+          },
+        },
+        include: { assignments: true, ...this.startersInclude },
+      });
+      return this.serialize({ ...process, _userTasks: userTasks });
+    }
     const process = await this.prisma.process.create({
       data: {
         name: dto.name,
@@ -64,7 +109,7 @@ export class ProcessesService {
           create: { version: 1, bpmnXml: dto.bpmnXml, createdById: userId },
         },
       },
-      include: { assignments: true },
+      include: { assignments: true, ...this.startersInclude },
     });
     return this.serialize({ ...process, _userTasks: userTasks });
   }
@@ -114,7 +159,7 @@ export class ProcessesService {
     const process = await this.prisma.process.update({
       where: { id },
       data,
-      include: { assignments: true },
+      include: { assignments: true, ...this.startersInclude },
     });
     return this.serialize(process);
   }
@@ -199,7 +244,7 @@ export class ProcessesService {
       return tx.process.update({
         where: { id },
         data: { bpmnXml: source.bpmnXml, version: nextVersion },
-        include: { assignments: true },
+        include: { assignments: true, ...this.startersInclude },
       });
     });
     return this.serialize(proc);
@@ -279,6 +324,49 @@ export class ProcessesService {
     return (process.assignments || []) as TaskAssignmentDto[];
   }
 
+  // -------------------------------------------------------------------------
+  // Process starters (شروع‌کنندگان مجاز) — the START event's assignment.
+  // Empty set = every user may start; non-empty = only those users + admins.
+  // -------------------------------------------------------------------------
+
+  async getStarters(id: string) {
+    await this.findOne(id, false);
+    const starters = await this.prisma.processStarter.findMany({
+      where: { processId: id },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    });
+    return starters.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      user: s.user,
+    }));
+  }
+
+  async setStarters(id: string, dto: SetStartersDto) {
+    await this.findOne(id, false);
+    const unique = [...new Set(dto.userIds)];
+    if (unique.length > 0) {
+      const found = await this.prisma.user.findMany({
+        where: { id: { in: unique } },
+        select: { id: true },
+      });
+      if (found.length !== unique.length) {
+        throw new BadRequestException('userIds contains unknown user ids');
+      }
+    }
+    // Replace-all, transactionally (same pattern as assignments/variables)
+    await this.prisma.$transaction([
+      this.prisma.processStarter.deleteMany({ where: { processId: id } }),
+      ...unique.map((userId) =>
+        this.prisma.processStarter.create({
+          data: { processId: id, userId },
+        }),
+      ),
+    ]);
+    return this.getStarters(id);
+  }
+
   async getVariables(id: string) {
     await this.findOne(id, false);
     const variables = await this.prisma.processVariable.findMany({
@@ -335,6 +423,15 @@ export class ProcessesService {
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     };
+    if (p.starters) {
+      // Declarative starter restriction — empty array means unrestricted
+      base.starters = p.starters.map((s: any) => ({
+        userId: s.userId,
+        user: s.user
+          ? { id: s.user.id, name: s.user.name, email: s.user.email, role: s.user.role }
+          : undefined,
+      }));
+    }
     if (p.assignments) {
       base.assignments = p.assignments.map((a: any) => ({
         id: a.id,

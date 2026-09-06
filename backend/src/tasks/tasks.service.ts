@@ -96,8 +96,14 @@ export class TasksService {
     };
   }
 
+  /**
+   * [ADMIN] All waiting (PENDING) tasks across all instances.
+   * کارتابل semantics: only *received* tasks are listed — passed/completed
+   * tasks live in the instance timeline, not in anyone's inbox.
+   */
   async findAll() {
     return this.prisma.task.findMany({
+      where: { status: 'PENDING' },
       include: {
         assignee: { select: { id: true, email: true, name: true } },
         position: { select: { id: true, name: true, department: { select: { id: true, name: true } } } },
@@ -119,6 +125,9 @@ export class TasksService {
    *
    * Once a position-based task is claimed by another user, it disappears from
    * this user's queue (assigneeId is no longer null).
+   *
+   * کارتابل shows only RECEIVED (PENDING) tasks — a completed task leaves the
+   * inbox immediately; history stays visible on the instance detail timeline.
    */
   async findMine(userId: string) {
     // Get all position IDs the user holds
@@ -130,6 +139,7 @@ export class TasksService {
 
     const tasks = await this.prisma.task.findMany({
       where: {
+        status: 'PENDING',
         OR: [
           // Directly assigned to me (includes position tasks I've claimed)
           { assigneeId: userId },
@@ -166,6 +176,47 @@ export class TasksService {
         ? { ...t.form, fields: typeof t.form.fields === 'string' ? JSON.parse(t.form.fields) : t.form.fields }
         : null,
     }));
+  }
+
+  /**
+   * Tasks the user has PARTICIPATED in — the history counterpart of the
+   * کارتابل (v4): tasks that were once RECEIVED by the user (assigneeId =
+   * user, direct or claimed) and have since PASSED:
+   *  - COMPLETED — the user submitted the form and advanced the flow
+   *  - CANCELLED — the instance ended/terminated while the task was still
+   *    waiting in the user's inbox
+   *
+   * The inbox (findMine) stays pending-only; this powers the dedicated
+   * «سوابق کارتابل» (participated tasks) view. Order: most recently
+   * passed first (completedAt desc; cancelled tasks keep completedAt null
+   * and sort by creation date after the completed ones).
+   */
+  async findParticipated(userId: string) {
+    return this.prisma.task.findMany({
+      where: {
+        assigneeId: userId,
+        status: { in: ['COMPLETED', 'CANCELLED'] },
+      },
+      include: {
+        assignee: { select: { id: true, email: true, name: true } },
+        position: {
+          select: {
+            id: true,
+            name: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+        form: { select: { id: true, name: true } },
+        processInstance: {
+          select: {
+            id: true,
+            status: true,
+            process: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+    });
   }
 
   /**
@@ -366,8 +417,16 @@ export class TasksService {
         where: { id },
         data: { assigneeId: userId },
       });
+    } else {
+      // Open task (neither assignee nor position): any authenticated user
+      // may complete it. Record who actually did, so the completion shows
+      // up in their participated history (سوابق کارتابل) — same rule as
+      // position tasks completed without claiming.
+      await this.prisma.task.update({
+        where: { id },
+        data: { assigneeId: userId },
+      });
     }
-    // If neither assigneeId nor positionId is set, anyone can complete (open task)
 
     // 1. Persist form submission FIRST (needed for crash recovery)
     if (dto.data && Object.keys(dto.data).length > 0) {

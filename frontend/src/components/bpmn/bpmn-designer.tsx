@@ -20,6 +20,8 @@ interface BpmnDesignerProps {
   onAssignmentAction?: (element: any) => void;
   /** Fired when the user asks to edit gateway/flow conditions (context menu, toolbar button) */
   onConditionAction?: (element: any, modeler: any) => void;
+  /** Fired when the user opens the start event's "assign starters" dialog */
+  onStartersAction?: () => void;
 }
 
 export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -67,6 +69,7 @@ export function BpmnDesigner({
   initialXml,
   onAssignmentAction,
   onConditionAction,
+  onStartersAction,
 }: BpmnDesignerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
@@ -277,6 +280,8 @@ export function BpmnDesigner({
   // Latest-ref so init-time listeners always call the current prop
   const onConditionActionRef = useRef(onConditionAction);
   onConditionActionRef.current = onConditionAction;
+  const onStartersActionRef = useRef(onStartersAction);
+  onStartersActionRef.current = onStartersAction;
 
   const selectedSupportsCondition =
     !!selectedElement &&
@@ -297,12 +302,24 @@ export function BpmnDesigner({
   const contextMenuItems = contextMenu?.element ? (() => {
     const el = contextMenu.element;
     const isTask = el.type?.includes('Task');
+    const isStartEvent = el.type === 'bpmn:StartEvent';
     const isConditionalGateway =
       el.type === 'bpmn:ExclusiveGateway' || el.type === 'bpmn:InclusiveGateway';
     const isSequenceFlow = el.type === 'bpmn:SequenceFlow';
     const items: { label: string; icon: string; action: () => void; danger?: boolean }[] = [
       { label: 'ویرایش نام', icon: '✏️', action: () => { renameSelected(); setContextMenu(null); } },
     ];
+    if (isStartEvent) {
+      // Start event "assignment": which users may START the process
+      items.push({
+        label: 'تعیین شروع‌کنندگان',
+        icon: '👥',
+        action: () => {
+          onStartersActionRef.current?.();
+          setContextMenu(null);
+        },
+      });
+    }
     if (isConditionalGateway || isSequenceFlow) {
       items.push({
         label: isConditionalGateway ? 'مدیریت شرط‌ها' : 'ویرایش شرط',

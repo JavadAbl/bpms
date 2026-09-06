@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   GitBranch,
+  History,
   Workflow,
   Building2,
   Tags,
@@ -87,6 +88,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const navItems = [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, show: true },
     { href: '/tasks', label: t.myTasks, icon: ClipboardList, show: true },
+    { href: '/tasks/participated', label: t.participatedTasks, icon: History, show: true },
     { href: '/instances', label: t.instances, icon: GitBranch, show: isAdmin },
     { href: '/processes', label: t.processes, icon: Workflow, show: isAdmin },
     { href: '/admin/departments', label: t.departments, icon: Building2, show: isAdmin },

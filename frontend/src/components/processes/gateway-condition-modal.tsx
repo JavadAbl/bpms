@@ -25,8 +25,10 @@ export interface ConditionVariable {
   name: string;
   label?: string;
   type: string;
-  /** for select-type form fields — used by the dry-run tester dropdown */
-  options?: string[];
+  /** Selectable values of select/radio variables — resolved the SAME way the
+  *  runtime form renders them: category items (Persian labels) or inline
+  *  options. Keeps the no-code builder in sync with what users submit. */
+  options?: { value: string; label: string }[];
 }
 
 interface Props {
@@ -134,7 +136,7 @@ interface RowTest {
  */
 function runBody(body: string, vars: Record<string, unknown>): RowTest {
   if (!body) return { kind: 'always' }; // no condition → always taken
-  let fn: Function;
+  let fn: any;
   try {
     // Compile-only here; execution below mirrors the engine's vm run
     // eslint-disable-next-line no-new-func
@@ -478,7 +480,7 @@ export function GatewayConditionModal({ open, element, modeler, variables, onClo
         </Select>
       );
     }
-    if (v.type === 'select' && v.options && v.options.length > 0) {
+    if (v.options && v.options.length > 0) {
       return (
         <Select
           value={raw || SAMPLE_UNSET}
@@ -495,8 +497,8 @@ export function GatewayConditionModal({ open, element, modeler, variables, onClo
           <SelectContent>
             <SelectItem value={SAMPLE_UNSET}>نامشخص (undefined)</SelectItem>
             {v.options.map((o) => (
-              <SelectItem key={o} value={o}>
-                {o}
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -680,6 +682,30 @@ export function GatewayConditionModal({ open, element, modeler, variables, onClo
                           <SelectContent>
                             <SelectItem value="true">درست (true)</SelectItem>
                             <SelectItem value="false">نادرست (false)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : variables.find((v) => v.name === row.variable)?.options?.length ? (
+                        // No-code value picker: the variable is a select/radio —
+                        // offer its values (with Persian labels) instead of
+                        // asking the user to type the raw value.
+                        <Select
+                          value={row.value || 'none'}
+                          onValueChange={(v) => updateRow(row.flowId, { value: v === 'none' ? '' : v })}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-card">
+                            <SelectValue placeholder="مقدار" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" disabled>
+                              انتخاب مقدار
+                            </SelectItem>
+                            {(variables
+                              .find((v) => v.name === row.variable)
+                              ?.options ?? []).map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       ) : (

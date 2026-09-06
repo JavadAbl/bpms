@@ -5,11 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
  * Aggregated, read-only KPI data for the landing dashboard.
  *
  * Scoping mirrors the existing list endpoints exactly:
- *  - ADMIN  → global numbers (all tasks / all instances)
+ *  - ADMIN  → global numbers (all tasks / all instances / all processes)
  *  - USER   → own-scope numbers:
  *      tasks      : assigneeId = me OR (positionId ∈ myPositions AND unclaimed)   (= /tasks/mine)
  *      instances  : startedById = me OR tasks.some.assigneeId = me                (= /process-instances/mine)
- *      processes  : ACTIVE count is global (any user can start any active process)
+ *      processes  : ACTIVE processes the user may START                            (= start-process dialog)
+ *                  (empty starter set = everyone; otherwise members only — the
+ *                   exact gate ProcessInstancesService.start() enforces)
  *
  * No schema changes — pure aggregation over existing tables.
  */
@@ -25,6 +27,10 @@ export class DashboardService {
     // ---------------------------------------------------------------------
     let taskWhere: any = {};
     let instanceWhere: any = {};
+    // Non-admins only count ACTIVE processes they are allowed to start:
+    // no starter restriction, or they are on the starter list. ADMIN sees
+    // the global count (and always bypasses the starter gate at start()).
+    let processWhere: any = { status: 'ACTIVE' };
 
     if (!isAdmin) {
       const userPositions = await this.prisma.userPosition.findMany({
@@ -44,6 +50,11 @@ export class DashboardService {
 
       instanceWhere = {
         OR: [{ startedById: userId }, { tasks: { some: { assigneeId: userId } } }],
+      };
+
+      processWhere = {
+        status: 'ACTIVE',
+        OR: [{ starters: { none: {} } }, { starters: { some: { userId } } }],
       };
     }
 
@@ -70,7 +81,7 @@ export class DashboardService {
         where: { AND: [instanceWhere, { status: 'RUNNING' }] },
       }),
 
-      this.prisma.process.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.process.count({ where: processWhere }),
 
       // Only completedAt needed — bucketed per-day below
       this.prisma.processInstance.findMany({

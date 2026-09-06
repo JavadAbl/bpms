@@ -38,6 +38,7 @@ async function main() {
   await prisma.formSubmission.deleteMany();
   await prisma.task.deleteMany();
   await prisma.taskAssignment.deleteMany();
+  await prisma.processStarter.deleteMany();
   await prisma.processInstance.deleteMany();
   await prisma.processVariable.deleteMany();
   await prisma.process.deleteMany();
@@ -47,7 +48,7 @@ async function main() {
   await prisma.userPosition.deleteMany();
   await prisma.position.deleteMany();
   await prisma.department.deleteMany();
-  console.log('🧹 Cleared: submissions, tasks, assignments, instances, variables, processes, forms, categories, positions, departments (users preserved)');
+  console.log('🧹 Cleared: submissions, tasks, assignments, starters, instances, variables, processes, forms, categories, positions, departments (users preserved)');
 
   // -----------------------------------------------------------------------
   // 2) Reuse existing users (do NOT touch their rows/passwords)

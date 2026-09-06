@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/common/data-table';
@@ -53,7 +52,6 @@ export function TasksView({ onViewTask }: Props) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const { toast } = useToast();
 
@@ -86,25 +84,23 @@ export function TasksView({ onViewTask }: Props) {
     }
   };
 
-  const pendingCount = tasks.filter((task) => task.status === 'PENDING').length;
-
+  // کارتابل = received tasks only. The backend (/tasks/mine) already returns
+  // PENDING tasks exclusively — completed/passed tasks are not part of the
+  // inbox (they stay visible on the instance timeline). Search is the only
+  // client-side filter left.
   const filtered = useMemo(() => {
+    if (!search) return tasks;
+    const q = search.trim();
     return tasks.filter((task) => {
-      if (statusFilter === 'PENDING' && task.status !== 'PENDING') return false;
-      if (statusFilter === 'DONE' && task.status === 'PENDING') return false;
-      if (search) {
-        const q = search.trim();
-        const haystack = [
-          task.name,
-          task.processInstance?.process?.name ?? '',
-          task.assignee?.name ?? '',
-          task.position?.name ?? '',
-        ].join(' ');
-        if (q && !haystack.includes(q)) return false;
-      }
-      return true;
+      const haystack = [
+        task.name,
+        task.processInstance?.process?.name ?? '',
+        task.assignee?.name ?? '',
+        task.position?.name ?? '',
+      ].join(' ');
+      return haystack.includes(q);
     });
-  }, [tasks, statusFilter, search]);
+  }, [tasks, search]);
 
   const columns: GridColDef[] = [
     {
@@ -240,7 +236,7 @@ export function TasksView({ onViewTask }: Props) {
         <div className="flex items-center gap-3">
           <ClipboardList className="w-6 h-6 text-primary" />
           <h2 className="text-2xl font-bold">{t.myTasks}</h2>
-          <Badge variant="secondary">{pendingCount.toLocaleString('fa-IR')} در انتظار</Badge>
+          <Badge variant="secondary">{tasks.length.toLocaleString('fa-IR')} در انتظار اقدام</Badge>
         </div>
         <Button variant="outline" size="sm" onClick={load}>
           <RefreshCw className="w-4 h-4 ml-2" />
@@ -248,7 +244,7 @@ export function TasksView({ onViewTask }: Props) {
         </Button>
       </div>
 
-      {/* Filter row */}
+      {/* Filter row — کارتابل lists received (pending) tasks only; search is the sole filter */}
       <Card>
         <CardContent className="p-3 flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-52">
@@ -260,16 +256,6 @@ export function TasksView({ onViewTask }: Props) {
               className="ps-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder={t.status} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.all}</SelectItem>
-              <SelectItem value="PENDING">{t.PENDING}</SelectItem>
-              <SelectItem value="DONE">{t.COMPLETED}</SelectItem>
-            </SelectContent>
-          </Select>
         </CardContent>
       </Card>
 

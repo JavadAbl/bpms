@@ -42,6 +42,10 @@
     "mini-services",
     "skills",
     "examples",
-    "bpms-v2"
+    "bpms-v2",
+    "upload",
+    "download",
+    "tool-results",
+    "scripts"
   ]
 }

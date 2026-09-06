@@ -23,6 +23,17 @@ export class CreateProcessDto {
   })
   @IsString()
   bpmnXml: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Optional starter restriction (the START event assignment): only these users ' +
+      '(plus admins) may start instances. Empty/omitted = every user may start.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  starterIds?: string[];
 }
 
 export class UpdateProcessDto {
@@ -61,6 +72,18 @@ export class RestoreVersionDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class SetStartersDto {
+  @ApiProperty({
+    type: [String],
+    description:
+      'User ids allowed to start this process. An EMPTY array removes the ' +
+      'restriction — every user may start (admins always may either way).',
+  })
+  @IsArray()
+  @IsUUID('all', { each: true })
+  userIds: string[];
 }
 
 export const ASSIGNMENT_STRATEGIES = [

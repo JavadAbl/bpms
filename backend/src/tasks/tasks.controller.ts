@@ -27,15 +27,29 @@ export class TasksController {
 
   @Get()
   @Roles('ADMIN')
-  @ApiOperation({ summary: '[ADMIN] List all tasks across all instances' })
+  @ApiOperation({ summary: '[ADMIN] List all waiting (PENDING) tasks across all instances' })
   findAll() {
     return this.tasks.findAll();
   }
 
   @Get('mine')
-  @ApiOperation({ summary: 'List tasks assigned to the current user' })
+  @ApiOperation({
+    summary:
+      'List the RECEIVED (PENDING) tasks of the current user — completed/passed tasks leave the کارتابل',
+  })
   findMine(@Req() req: any) {
     return this.tasks.findMine(req.user.id);
+  }
+
+  @Get('participated')
+  @ApiOperation({
+    summary:
+      'List the tasks the current user has PARTICIPATED in (سوابق کارتابل): ' +
+      'once-received tasks that have since passed — COMPLETED by the user or ' +
+      'CANCELLED when the instance ended. Counterpart of /tasks/mine.',
+  })
+  findParticipated(@Req() req: any) {
+    return this.tasks.findParticipated(req.user.id);
   }
 
   @Get(':id')

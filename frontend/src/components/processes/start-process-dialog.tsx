@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { processesApi, processInstancesApi, tasksApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
+import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,7 +14,8 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Play, RefreshCw } from 'lucide-react';
+import { Lock, Play, RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Props {
   open: boolean;
@@ -58,8 +60,11 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
   const [starting, setStarting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { user } = useAuth();
 
-  // Load startable (ACTIVE) processes each time the dialog opens
+  // Load startable (ACTIVE + permitted) processes each time the dialog opens.
+  // A process with a starter list may only be started by its starters (admins
+  // bypass); an empty list means everyone may start.
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -67,7 +72,14 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
       .findAll()
       .then((data) => {
         if (!alive) return;
-        const active = (data || []).filter((p: any) => p.status === 'ACTIVE');
+        const active = (data || [])
+          .filter((p: any) => p.status === 'ACTIVE')
+          .filter((p: any) => {
+            const starters: string[] = (p.starters || []).map((s: any) => s.userId);
+            if (starters.length === 0) return true; // unrestricted
+            if (user?.role === 'ADMIN') return true;
+            return !!user?.userId && starters.includes(user.userId);
+          });
         setProcesses(active);
         setSelectedProcess(
           initialProcessId && active.some((p: any) => p.id === initialProcessId)
@@ -81,7 +93,7 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
     return () => {
       alive = false;
     };
-  }, [open, initialProcessId]);
+  }, [open, initialProcessId, user, toast]);
 
   const handleStart = async () => {
     if (!selectedProcess) return;
@@ -114,11 +126,27 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
               <SelectContent>
                 {processes.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.name} (v{p.version})
+                    <span className="flex items-center gap-2">
+                      <span className="truncate">{p.name} (v{p.version})</span>
+                      {(p.starters || []).length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] gap-1 px-1.5 shrink-0"
+                        >
+                          <Lock className="w-3 h-3" />
+                          محدود
+                        </Badge>
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {processes.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                فرآیند فعالی برای شروع در دسترس شما نیست.
+              </p>
+            )}
           </div>
           <Button
             onClick={handleStart}

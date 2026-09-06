@@ -47,9 +47,13 @@ export class ProcessInstancesController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Start a new process instance from a process definition' })
+  @ApiOperation({
+    summary:
+      'Start a new process instance. If the process has a starter restriction ' +
+      '(START event assignment), only its members (and admins) may start — 403 otherwise.',
+  })
   start(@Body() dto: StartInstanceDto, @Req() req: any) {
-    return this.instances.start(dto, req.user.id);
+    return this.instances.start(dto, req.user);
   }
 
   @Post(':id/terminate')

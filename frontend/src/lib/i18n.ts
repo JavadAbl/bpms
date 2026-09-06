@@ -8,6 +8,7 @@ export const t = {
   
   // Navigation
   myTasks: 'کارتابل',
+  participatedTasks: 'سوابق کارتابل',
   instances: 'گزارش فرآیندها',
   processes: 'تعریف فرآیندها',
   forms: 'فرم‌ها',
@@ -36,6 +37,7 @@ export const t = {
   release: 'رها کردن',
   complete: 'تکمیل',
   noTasks: 'وظیفه‌ای یافت نشد',
+  noParticipatedTasks: 'هنوز وظیفه‌ای انجام نداده‌اید',
   selfService: 'خودخدمت',
   
   // Task statuses

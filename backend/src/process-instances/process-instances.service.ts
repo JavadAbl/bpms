@@ -446,27 +446,46 @@ export class ProcessInstancesService implements OnModuleInit {
     });
   }
 
-  async start(dto: StartInstanceDto, userId: string) {
+  async start(dto: StartInstanceDto, user: { id: string; role?: string }) {
     const process = await this.prisma.process.findUnique({
       where: { id: dto.processId },
-      include: { assignments: true },
+      include: {
+        assignments: true,
+        starters: { select: { userId: true } },
+      },
     });
     if (!process) throw new NotFoundException(`Process ${dto.processId} not found`);
     if (process.status !== 'ACTIVE') {
       throw new BadRequestException(`Process must be ACTIVE to start. Current: ${process.status}`);
     }
 
+    // START event assignment — declarative starter restriction. An empty
+    // starter set means every user may start; a non-empty set restricts
+    // starting to its members (ADMIN always may, so flows never dead-end).
+    if (
+      process.starters.length > 0 &&
+      user.role !== 'ADMIN' &&
+      !process.starters.some((s) => s.userId === user.id)
+    ) {
+      this.logger.warn(
+        `User ${user.id} is not allowed to start process ${process.id} (starter restriction: ${process.starters.length} users)`,
+      );
+      throw new ForbiddenException(
+        'شما مجاز به شروع این فرآیند نیستید — شروع آن به کاربران مشخصی محدود شده است',
+      );
+    }
+
     // Create instance record
     const instance = await this.prisma.processInstance.create({
       data: {
         processId: process.id,
-        startedById: userId,
+        startedById: user.id,
         status: 'RUNNING',
         bpmnXmlSnapshot: process.bpmnXml,
       },
     });
 
-    const callbacks = this.createCallbacks(instance.id, process.assignments, userId);
+    const callbacks = this.createCallbacks(instance.id, process.assignments, user.id);
 
     // Kick off the BPMN engine
     try {
@@ -487,7 +506,7 @@ export class ProcessInstancesService implements OnModuleInit {
       throw err;
     }
 
-    return this.findOne(instance.id, { id: userId });
+    return this.findOne(instance.id, { id: user.id, role: user.role });
   }
 
   /**

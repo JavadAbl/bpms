@@ -114,40 +114,27 @@ export function InstancesView({ onViewInstance }: Props) {
     if (start !== '1') setStartProcessId(start);
     setShowStart(true);
     router.replace('/instances', { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // one-shot deep link — intentionally ignores dep changes
   }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Role-aware scope: admins get the global report, regular users only
+      // their own instances (started by me / has a task for me) — same
+      // visibility rule as the dashboard KPIs, no 403 round-trip.
       const [insts, procs] = await Promise.all([
-        processInstancesApi.findAll(),
+        isAdmin ? processInstancesApi.findAll() : processInstancesApi.mine(),
         processesApi.findAll(),
       ]);
       setInstances(insts);
       setProcesses(procs.filter((p) => p.status === 'ACTIVE'));
     } catch (err: any) {
-      // The all-instances report is ADMIN-only — non-admins following a
-      // deep-link (palette/dashboard "start process") gracefully degrade
-      // to their own instances instead of an error screen.
-      if (err?.status === 403) {
-        try {
-          const [mine, procs] = await Promise.all([
-            processInstancesApi.mine(),
-            processesApi.findAll(),
-          ]);
-          setInstances(mine);
-          setProcesses(procs.filter((p) => p.status === 'ACTIVE'));
-        } catch (e: any) {
-          toast({ title: 'خطا', description: e.message, variant: 'destructive' });
-        }
-      } else {
-        toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-      }
+      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [isAdmin, toast]);
 
   useEffect(() => {
     load();

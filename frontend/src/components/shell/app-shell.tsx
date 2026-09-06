@@ -37,6 +37,7 @@ import { StartProcessDialog } from '@/components/processes/start-process-dialog'
 import {
   ClipboardList,
   GitBranch,
+  History,
   Workflow,
   Building2,
   Users,
@@ -63,6 +64,7 @@ function useNavItems(isAdmin: boolean) {
   return [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, show: true },
     { href: '/tasks', label: t.myTasks, icon: ClipboardList, show: true },
+    { href: '/tasks/participated', label: t.participatedTasks, icon: History, show: true },
     { href: '/instances', label: t.instances, icon: GitBranch, show: isAdmin },
     { href: '/processes', label: t.processes, icon: Workflow, show: isAdmin },
     { href: '/admin/departments', label: t.departments, icon: Building2, show: isAdmin },
@@ -73,6 +75,14 @@ function useNavItems(isAdmin: boolean) {
 
 function isActiveHref(pathname: string, href: string) {
   if (href === '/dashboard') return pathname === '/dashboard';
+  // '/tasks/participated' is a SIBLING page, not a child of the کارتابل inbox —
+  // keep the inbox item un-highlighted there (it still lights up on /tasks/:id detail).
+  if (href === '/tasks') {
+    return (
+      pathname === '/tasks' ||
+      (pathname.startsWith('/tasks/') && !pathname.startsWith('/tasks/participated'))
+    );
+  }
   return pathname === href || pathname.startsWith(href + '/');
 }
 

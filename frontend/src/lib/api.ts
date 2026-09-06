@@ -103,6 +103,7 @@ export const dashboardApi = {
 // ---------------------------------------------------------------------------
 export const tasksApi = {
   mine: () => apiFetch<any[]>('/tasks/mine'),
+  participated: () => apiFetch<any[]>('/tasks/participated'),
   findAll: () => apiFetch<any[]>('/tasks'),
   findOne: (id: string) => apiFetch<any>(`/tasks/${id}`),
   complete: (id: string, data: Record<string, any>) =>
@@ -131,14 +132,26 @@ export const processesApi = {
   findOne: (id: string) => apiFetch<any>(`/processes/${id}`),
   getUserTasks: (id: string) => apiFetch<any[]>(`/processes/${id}/user-tasks`),
   getAssignments: (id: string) => apiFetch<any[]>(`/processes/${id}/assignments`),
-  create: (data: { name: string; description?: string; bpmnXml: string }) =>
-    apiFetch('/processes', { method: 'POST', body: JSON.stringify(data) }),
+  create: (data: {
+    name: string;
+    description?: string;
+    bpmnXml: string;
+    /** optional initial starter restriction — empty/omitted = all users may start */
+    starterIds?: string[];
+  }) => apiFetch('/processes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Record<string, any>) =>
     apiFetch(`/processes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   setAssignments: (id: string, assignments: any[]) =>
     apiFetch(`/processes/${id}/assignments`, {
       method: 'PUT',
       body: JSON.stringify({ assignments }),
+    }),
+  getStarters: (id: string) => apiFetch<any[]>(`/processes/${id}/starters`),
+  /** Replace the starter set — empty array lifts the restriction (all users) */
+  setStarters: (id: string, userIds: string[]) =>
+    apiFetch(`/processes/${id}/starters`, {
+      method: 'PUT',
+      body: JSON.stringify({ userIds }),
     }),
   getVariables: (id: string) => apiFetch<any[]>(`/processes/${id}/variables`),
   getVersions: (id: string) => apiFetch<any[]>(`/processes/${id}/versions`),

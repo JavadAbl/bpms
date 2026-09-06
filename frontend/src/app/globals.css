@@ -203,8 +203,13 @@
    MD3 micro-interaction primitives (Phase 1)
    ============================================================ */
 @layer utilities {
-  /* MD3 state layer: 8% hover / 12% press overlay tinted by currentColor */
-  .state-layer {
+  /* MD3 state layer: 8% hover / 12% press overlay tinted by currentColor.
+     ⚠ The :not() guard is load-bearing: Tailwind emits `.absolute`/`.fixed`/
+     `.sticky` into this same utilities layer, and source order decides ties.
+     Without the guard, `position: relative` here silently overrode the
+     `state-layer absolute top-4 right-4` combo on the dialog/sheet close
+     buttons, dropping the X into the modal footer as a stretched grid row. */
+  .state-layer:where(:not(.absolute, .fixed, .sticky)) {
     position: relative;
   }
   .state-layer::after {

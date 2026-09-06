@@ -1,0 +1,16 @@
+src/components/bpmn/bpmn-designer.tsx(98,9): error TS2571: Object is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(101,21): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/components/bpmn/bpmn-designer.tsx(107,9): error TS18046: 'eventBus' is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(112,27): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/components/bpmn/bpmn-designer.tsx(119,9): error TS18046: 'eventBus' is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(146,24): error TS2571: Object is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(149,15): error TS2571: Object is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(164,30): error TS18046: 'selection' is of type 'unknown'.
+src/components/bpmn/bpmn-designer.tsx(169,15): error TS18046: 'modeling' is of type 'unknown'.
+src/components/forms/form-builder.tsx(138,40): error TS2345: Argument of type '{ name: any; description: any; fields: FormField[]; }' is not assignable to parameter of type '{ name: string; description?: string | undefined; fields: any[]; processId: string; }'.
+src/components/forms/form-builder.tsx(140,31): error TS2345: Argument of type '{ name: any; description: any; fields: FormField[]; }' is not assignable to parameter of type '{ name: string; description?: string | undefined; fields: any[]; processId: string; }'.
+src/components/views/forms-view.tsx(25,35): error TS2554: Expected 1 arguments, but got 0.
+src/components/views/forms-view.tsx(147,10): error TS2741: Property 'processId' is missing in type '{ form: any; onClose: () => void; onSaved: () => Promise<void>; }' but required in type 'Props'.
+src/lib/api.ts(45,9): error TS2322: Type '{ 'Content-Type': string; } | { append(name: string, value: string): void; delete(name: string): void; get(name: string): string | null; getSetCookie(): string[]; has(name: string): boolean; ... 6 more ...; 'Content-Type': string; } | { ...; } | { ...; }' is not assignable to type 'Record<string, string>'.
+src/lib/format.ts(45,5): error TS2322: Type 'string' is not assignable to type 'T'.
+src/lib/i18n.ts(156,3): error TS1117: An object literal cannot have multiple properties with the same name.

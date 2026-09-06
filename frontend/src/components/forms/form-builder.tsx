@@ -153,9 +153,10 @@ export function FormBuilderDialog({ form, onClose, onSaved }: FormBuilderDialogP
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0" dir="rtl">
-        <DialogHeader className="p-4 border-b border-border">
+        <DialogHeader className="p-4 pe-12 border-b border-border">
           <div className="flex items-center justify-between">
             <DialogTitle>{form ? 'ویرایش فرم' : 'ایجاد فرم جدید'}</DialogTitle>
+            {/* pe-12 on the header reserves the top-left corner for the dialog's X (RTL: end side) */}
             <div className="flex gap-2">
               <Button
                 size="sm"
