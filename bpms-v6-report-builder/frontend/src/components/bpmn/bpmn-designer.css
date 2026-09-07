@@ -1,0 +1,14 @@
+/* BPMN canvas uses SVG coordinates — must stay LTR even in RTL app */
+.bpmn-canvas-container,
+.bpmn-canvas-container .djs-container {
+  direction: ltr;
+}
+
+/* bpmn-js measures text with Arial; match rendered font to avoid overflow */
+.bpmn-canvas-container .djs-label text,
+.bpmn-canvas-container .djs-label tspan {
+  direction: ltr;
+  unicode-bidi: plaintext;
+  font-family: Arial, sans-serif !important;
+  font-size: 11px;
+}
