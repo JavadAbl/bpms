@@ -8,6 +8,7 @@ build
 *.db
 *.zip
 *.tar
+*.rar
 
 tsconfig.build.tsbuildinfo
 
