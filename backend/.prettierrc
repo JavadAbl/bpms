@@ -1,0 +1,7 @@
+{
+  "singleQuote": true,
+  "trailingComma": "all",
+  "objectWrap": "collapse",
+  "proseWrap": "preserve",
+  "printWidth": 110
+}

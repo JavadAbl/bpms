@@ -400,7 +400,7 @@ function AssignUserDialog({ positionId, users, onClose, onAssigned }: { position
               <SelectContent>
                 {users.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.name} ({u.email})
+                    {u.name} ({u.username || u.email})
                   </SelectItem>
                 ))}
               </SelectContent>

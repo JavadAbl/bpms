@@ -19,7 +19,6 @@ import {
   LayoutDashboard,
   ClipboardList,
   GitBranch,
-  History,
   Workflow,
   Building2,
   Tags,
@@ -28,6 +27,7 @@ import {
   SunMoon,
   LogOut,
   Play,
+  FileEdit,
 } from 'lucide-react';
 
 /**
@@ -89,8 +89,8 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const navItems = [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, show: true },
     { href: '/tasks', label: t.myTasks, icon: ClipboardList, show: true },
-    { href: '/tasks/participated', label: t.participatedTasks, icon: History, show: true },
-    { href: '/instances', label: t.instances, icon: GitBranch, show: isAdmin },
+    { href: '/drafts', label: t.drafts, icon: FileEdit, show: true },
+    { href: '/cases', label: t.myCases, icon: GitBranch, show: true },
     { href: '/processes', label: t.processes, icon: Workflow, show: isAdmin },
     { href: '/admin/departments', label: t.departments, icon: Building2, show: isAdmin },
     { href: '/admin/categories', label: t.categories, icon: Tags, show: isAdmin },
@@ -157,7 +157,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
                   key={p.id}
                   value={`process-${p.id}-${p.name || ''}`}
                   onSelect={() =>
-                    run(() => router.push(`/instances?start=${p.id}`))
+                    run(() => router.push(`/cases?start=${p.id}`))
                   }
                 >
                   <Play className="mr-2 rtl:ml-2 rtl:mr-0" />

@@ -2,12 +2,13 @@
 // Using SQLite for development persistence
 
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/common/infrastructure/database/generated/prisma"
+  moduleFormat = "esm"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -21,7 +22,8 @@ enum UserRole {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id() @default(uuid())
+  username  String   @unique
   email     String   @unique
   name      String
   password  String
@@ -39,6 +41,7 @@ model User {
   uploadedFiles      FileAttachment[]    @relation("FileUploadedBy")
   processStarters    ProcessStarter[]    @relation("ProcessStarterUser")
   createdReports     ReportDefinition[]  @relation("ReportCreatedBy")
+  processDrafts      ProcessDraft[]      @relation("ProcessDraftCreatedBy")
 
   @@map("users")
 }
@@ -48,7 +51,7 @@ model User {
 // ---------------------------------------------------------------------------
 
 model Department {
-  id          String   @id @default(uuid())
+  id          String   @id() @default(uuid())
   name        String   @unique
   description String?
   createdAt   DateTime @default(now())
@@ -60,7 +63,7 @@ model Department {
 }
 
 model Position {
-  id           String   @id @default(uuid())
+  id           String   @id() @default(uuid())
   departmentId String
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   name         String
@@ -82,7 +85,7 @@ model Position {
 
 // Many-to-many: a user can hold multiple positions across departments
 model UserPosition {
-  id         String   @id @default(uuid())
+  id         String   @id() @default(uuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   positionId String
@@ -98,7 +101,7 @@ model UserPosition {
 // ---------------------------------------------------------------------------
 
 model Form {
-  id          String   @id @default(uuid())
+  id          String   @id() @default(uuid())
   name        String
   description String?
   // Each form belongs to one process. Nullable in DB for legacy rows; API requires processId.
@@ -112,6 +115,7 @@ model Form {
   assignments     TaskAssignment[]
   tasks           Task[]
   submissions     FormSubmission[]
+  drafts          ProcessDraft[]
 
   @@map("forms")
 }
@@ -123,7 +127,7 @@ model Form {
 // ---------------------------------------------------------------------------
 
 model Category {
-  id          String   @id @default(uuid())
+  id          String   @id() @default(uuid())
   // Machine name referenced from form fields (e.g. "leave_types").
   // Constrained to identifier characters so values work in gateway conditions.
   key         String   @unique
@@ -139,7 +143,7 @@ model Category {
 }
 
 model CategoryItem {
-  id         String   @id @default(uuid())
+  id         String   @id() @default(uuid())
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   // Value persisted in form data / process variables (stable, e.g. "Sick")
@@ -164,7 +168,7 @@ enum ProcessStatus {
 }
 
 model Process {
-  id          String        @id @default(uuid())
+  id          String        @id() @default(uuid())
   name        String
   description String?
   bpmnXml     String
@@ -182,6 +186,7 @@ model Process {
   versions    ProcessVersion[]
   starters    ProcessStarter[]
   reports     ReportDefinition[]
+  drafts      ProcessDraft[]
 
   @@map("processes")
 }
@@ -194,7 +199,7 @@ model Process {
 // ProcessInstancesService.start() — no triggers, no code.
 // ---------------------------------------------------------------------------
 model ProcessStarter {
-  id        String   @id @default(uuid())
+  id        String   @id() @default(uuid())
   processId String
   process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
   userId    String
@@ -213,7 +218,7 @@ model ProcessStarter {
 // deployment versions): restoring an old version appends a NEW version row
 // and never rewrites history.
 model ProcessVersion {
-  id          String   @id @default(uuid())
+  id          String   @id() @default(uuid())
   processId   String
   process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
   version     Int
@@ -230,7 +235,7 @@ model ProcessVersion {
 
 // Process-scoped variables — defined at process level, bound to form fields
 model ProcessVariable {
-  id        String   @id @default(uuid())
+  id        String   @id() @default(uuid())
   processId String
   process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
   name      String
@@ -265,7 +270,7 @@ model ProcessVariable {
 // from ProcessInstance + FormSubmission data, never materialized.
 // ---------------------------------------------------------------------------
 model ReportDefinition {
-  id          String   @id @default(uuid())
+  id          String   @id() @default(uuid())
   name        String
   description String?
   processId   String
@@ -283,6 +288,29 @@ model ReportDefinition {
 }
 
 // ---------------------------------------------------------------------------
+// Process drafts — pre-start form fill. Created when the user picks a process
+// to start; the BPMN instance is only created when the draft is submitted.
+// ---------------------------------------------------------------------------
+
+model ProcessDraft {
+  id            String   @id() @default(uuid())
+  processId     String
+  process       Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  createdById   String
+  createdBy     User     @relation("ProcessDraftCreatedBy", fields: [createdById], references: [id])
+  // First userTask name resolved from BPMN at draft-create time
+  firstTaskName String
+  formId        String?
+  form          Form?    @relation(fields: [formId], references: [id], onDelete: SetNull)
+  // JSON string of filled field values (resumable from sidebar)
+  formData      String   @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("process_drafts")
+}
+
+// ---------------------------------------------------------------------------
 // Process Instances (runtime)
 // ---------------------------------------------------------------------------
 
@@ -294,7 +322,7 @@ enum InstanceStatus {
 }
 
 model ProcessInstance {
-  id         String         @id @default(uuid())
+  id         String         @id() @default(uuid())
   processId  String
   process    Process        @relation(fields: [processId], references: [id])
   status     InstanceStatus @default(RUNNING)
@@ -321,7 +349,7 @@ model ProcessInstance {
 // ---------------------------------------------------------------------------
 
 model TaskAssignment {
-  id         String  @id @default(uuid())
+  id         String  @id() @default(uuid())
   processId  String
   process    Process @relation(fields: [processId], references: [id], onDelete: Cascade)
   // Name of the userTask in the BPMN XML (e.g. "Approve Request")
@@ -375,7 +403,7 @@ enum TaskStatus {
 }
 
 model Task {
-  id                String         @id @default(uuid())
+  id                String         @id() @default(uuid())
   processInstanceId String
   processInstance   ProcessInstance @relation(fields: [processInstanceId], references: [id], onDelete: Cascade)
   // Name of the userTask from BPMN
@@ -417,7 +445,7 @@ model Task {
 // ---------------------------------------------------------------------------
 
 model FileAttachment {
-  id           String   @id @default(uuid())
+  id           String   @id() @default(uuid())
   // Name shown to users (UTF-8, can be Persian)
   originalName String
   // Generated disk name (uuid + sanitized extension) — never user-controlled
@@ -439,7 +467,7 @@ model FileAttachment {
 // ---------------------------------------------------------------------------
 
 model FormSubmission {
-  id        String   @id @default(uuid())
+  id        String   @id() @default(uuid())
   taskId    String
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   formId    String?

@@ -71,7 +71,7 @@ export function ProcessStartersModal({
   const filteredUsers = useMemo(() => {
     const q = search.trim();
     if (!q) return users;
-    return users.filter((u) => `${u.name} ${u.email}`.includes(q));
+    return users.filter((u) => `${u.name} ${u.username ?? ''} ${u.email}`.includes(q));
   }, [users, search]);
 
   const toggleUser = (id: string) => {
@@ -205,7 +205,7 @@ export function ProcessStartersModal({
                           className="block text-[11px] text-muted-foreground truncate"
                           dir="ltr"
                         >
-                          {u.email}
+                          {u.username || u.email}
                         </span>
                       </span>
                       <Badge variant="secondary" className="text-[10px] shrink-0">

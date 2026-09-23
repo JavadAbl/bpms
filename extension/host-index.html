@@ -1,0 +1,530 @@
+
+
+
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>اتوماسیون اداری - گروه نرم افزاری پیوست</title>
+    <link href="/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+    <meta name="viewport" content="width=device-width" />
+    
+
+
+    
+    
+    
+    <link href="/Content/Themes/Workspace/jstree/default-rtl/style.css" rel="stylesheet"/>
+<link href="/Content/Themes/Workspace/jstree/default-rtl/custom_style.css?ver=639193537312330684" rel="stylesheet"/>
+
+
+    <link href="/Content/Fonts.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Common/Site.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+
+    <link href="/Content/Libs/jqGrid/jquery-ui-1.10.3.custom.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/jquery-ui.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/jquery-ui.customized.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/jqGrid/jquery-ui.custom.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/_Layout.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/layoutColors.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/navigationPanelColors.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/comboBox.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/objectPicker/objectPicker.jquery-ui.custom.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+<link href="/Content/Themes/Workspace/commands.css?ver=639193537312330684" rel="stylesheet" type="text/css" />
+
+    <link href="/Content/OA/Commands.css?ver=639193537312330684" rel="stylesheet"/>
+
+
+	<link href="/Content/Libs/icheck/minimal/purple.css" rel="stylesheet"/>
+
+	<link href="/Content/jqtree.css?ver=639193537312330684" rel="stylesheet"/>
+
+
+    <link href="/Content/Libs/icheck/minimal/purple.override.css?ver=639193537312330684" rel="stylesheet"/>
+
+	<link href="/Content/Libs/icheck/minimal/purple.hued.css?ver=639193537312330684" rel="stylesheet"/>
+
+
+
+    <script src="/Scripts/libs/modernizr-3.12.0.js"></script>
+
+</head>
+
+
+<body data-issingleformmode="False">
+    <script type="text/javascript">
+
+if( typeof psg==='undefined' )
+    psg = {};
+if( !psg.common )
+    psg.common = {};
+if( !psg.common.JSSettings )
+	psg.common.JSSettings = {"requireJS":{"waitSeconds":"160"},"appVersion":"639193537312330684","UploadProhabitedUnSecureExtentions":"","agentConfigPort":"44239","agentConfigSignalRPort":"44644","customFonts":"Tahoma; Arial; B Nazanin; Titr; B Mitra","enableWebDavViaMacro":true}
+
+</script>
+    <script src="/Scripts/Libs/require.js"></script>
+
+	<script src="/Scripts/OA/initApp.js?ver=639193537312330684"></script>
+
+
+    <script type="text/javascript">
+        require( 
+        [ 'jquery' ],
+        function(){
+            require( [ 'jquery-migrate' ], 
+            function ()
+            {              
+                //$.getScript('https://localhost:44367/Scripts/_project/InteractiveHelp/InteractiveHelp.js?v=9', function () {
+                //    $('body').interactiveHelp({userId: '20',isAdministrtor:true });
+                //});
+                require( ['jquery.ui', 'jquery.ui.touch-punch'],
+                function ()
+                {
+                    require( ['scripts/libs/plugins/combobox'],
+                    function ()
+                    {
+                        require( [ 'jquery-ajax-unobtrusive', 'scripts/common/psg.ui.popup', 'oa/payvast/psg.sketch' ],
+                        function()
+                        {
+                            // ~/bundles/oa
+                            require( ['psg.common', 'oa/strings.resx',
+                                      'psg.utility', 'oa/payvast/psg.shared.wsnpane'],
+                            function ()
+                            {
+                                require( ['psg.ui'],
+                                function ()
+                                {
+                                    // ~/bundles/common
+                                    require( ['scripts/common/jquery.extensions/jquery.sum'],
+                                    function ()
+                                    {
+                                        psg.ui.setCurrentTheme( 'Workspace' );
+
+                                        // ~/bundles/payvast/commands
+                                        require( ['oa/payvast/commands/psg.oa.cmds.lettercontentview',
+                                                  'oa/payvast/commands/psg.headbar.headbaritem', 'oa/payvast/commands/psg.headbar.actionitem',
+                                                  'oa/payvast/commands/psg.headbar.radioitem', 'oa/payvast/commands/psg.headbar.checkboxitem',
+                                                  'oa/payvast/commands/psg.headbar.commanditem', 'oa/payvast/commands/psg.headbar.dropdowngroupitem',
+                                                  'oa/payvast/commands/psg.headbar.splitbuttonitem'],
+                                        function ()
+                                        {
+                                            require( [ 'jqgrid', 'jcarousel',
+                                                       'scripts/libs/jquery.iviewer', 'scripts/libs/jquery.mousewheel.min'],
+                                            function ()
+                                            {
+                                                require( ['scripts/libs/jquery.base64'],
+                                                function ()
+                                                {
+                                                    if ( !window.atob && $.base64 && $.base64.atob ) window.atob = $.base64.atob; if ( !window.btoa && $.base64 && $.base64.btoa ) window.btoa = $.base64.btoa;
+                                                    require( ['scripts/libs/jquery.icheck'],
+                                                    function ()
+                                                    {
+                                                        require( ['oa/payvast/views.shared._layout'],
+                                                        function ()
+                                                        {
+                                                        	$( '#expand-services' ).on( 'click', function( ){ psg.views.shared.layout.expandServicesClick(); return false; });
+
+                                                            $( '#user-profile-info' ).on( 'click', function () { psg.views.shared.layout.userProfileInfoClick(); return false; } );
+                                                            $( '#setting-button' ).on( 'click', function () { psg.ui.layout.load( $( '#setting-button a' ).data( 'main-url' )); });
+                                                        } );
+                                                    } );
+                                                } );
+                                            } );
+                                        } );
+                                    } );
+                                } );
+                            } );
+                        } );
+                    } );
+                } );
+            } );
+        } );
+    </script>
+
+    <input id="layout-session-encryption-key"type="hidden" value="s;IOpH254WevVMptEV8viYtZH&lt;IsC_94hr&gt;R498&lt;wQUVQNipqRENo?ZJAi6cy8kOM`=]&gt;Mp&lt;MuxH3M8tLR1kJe?XHnAE2N=o_68j" />
+
+    <header class="content-wrapper">
+
+        <div id="header-logo" class="header-section">
+            <div>
+                <span id="logo-image" data-for="" class="show-in-mobile">
+                                    </span>
+                <span id="back-image" data-for="" class="hide-in-mobile"></span>
+            </div>
+        </div>                
+        
+        <div id="header-expand-services" class="header-section">
+            <a id="expand-services" href="#"></a>
+        </div>
+        
+        <div id="header-commands" class="header-section">
+            <input id="header-commands-inProgressStateQueue" type="hidden" name="header-commands-inProgressStateQueue" value="0" />
+                <div class="holder-header-search-mobile show-in-mobile" style="display:none">
+                    <input id="header-search-mobile" type="search" name="header-Search" class="search-Mobile hide-in-mobile" data-cardtable-type="Search" value="" />
+                </div>
+
+            <div class="ui-state-default ui-action-bar ui-widget">
+                <ul id="commands">
+                    <li id="inprogress-state" style="display: none">
+                        <label>
+                            <span>
+                                <img src="/Images/metro-loading.gif" alt="" />
+                            </span>
+                            <span>در حال اجرای عملیات</span>
+                        </label>
+                    </li>
+                    <li id="more-commands" style="display: none;" class="ui-menu-item">
+                        <label><span><a>. . . </a></span></label>
+                        <ul class="ui-widget ui-widget-content"></ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="header-userinfo" class="header-section">
+            <div>
+                <div id="header-userinfo-inner">
+                    
+                        <div id="user-profile-info">
+                            <div class="user-profile-image">
+                                    <img src="/Content/Shell/user-noimage.png">
+
+                            </div>
+                            <div class="user-active-position">
+                                كارشناس فن آوري اطلاعات شركت آتيه سازان اميد نسل امروز(ستاد-مديريت فناوري اطلاعات)
+                            </div>
+                        </div>
+                        <div class="item-separator-line"></div>
+                            <div id="setting-button" title="ابزار" data-cardtable-type=Tools>
+                                <a href="" onclick="return false;" data-main-url=/OA/WorkSpace/WorkspaceToolsMenu?objectListMode=Tools data-ignore-workspaceowner="true" data-title="ابزار">
+                                    <img src="/Images/setting-icon.png">
+                                </a>
+                            </div>
+                            <div class="item-separator-line"></div>
+                        <div id="notifications">
+                            <div>
+
+                                <div class="notification-icon">
+                                    <img src="/Images/notifications-icon.png">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="item-separator-line"></div>
+                        <a id="signout-icon" href="/Home/Shell" title="ليست برنامه‌ها">
+                            <img src="/Images/sign-out-option.png"  alt="ليست برنامه‌ها">
+                        </a>
+                        <div id="user-profile-information"></div>
+
+                    <span id="mobileSearch-link"></span>
+                    <a id="signout-link" href="/Home/Shell">
+                    </a>
+
+
+                </div>
+            </div>
+        </div>
+
+    </header>
+
+    <section class="content-wrapper" id="main-content">
+        <div id="workspaceNavigator">
+            <div id="workspaceNavigatorWrapper">
+<link href=/Content/_NavigationPanel.css?ver=639193537312330684 rel="stylesheet" />
+
+
+
+<div class="wsn-nav-wrapper" data-for="cardtable">
+    <input id="workspaceOwner" name="workspaceOwner" type="hidden" value="" />
+    <nav id="oa-nav" class="wsn-nav">
+        <a class="wsnPane-slide-btn arrow-holder ui-icon ui-icon-carat-1-e" onclick="psg.ui.shared.wsNPane.toggle( );return false;"></a>
+
+            <div class="search" data-cardtable-type="Search">
+                <input type="text" name="searchText" class="text" autocomplete="off" data-enter-pressed="false" value="" placeholder="جستجو" onblur="searchTextOnblur( )" onfocus="document.getElementById( 'divAdvancedSearch' ).style.display = 'block'" onkeypress="document.getElementById( 'divAdvancedSearch' ).style.display = 'none'"  />
+                <span class="search-button ui-icon ui-icon-search"></span>
+            </div>
+            <div id="divAdvancedSearch" style="position: absolute; padding: 4px 0 4px 0; right: 5px; top: 55px; width: 188px; border: 2px solid black; z-index: 10000; display: none; background-color: white;">
+
+                <a class="advancedSearch" onfocus="document.getElementById( 'divAdvancedSearch' ).style.display = 'block'" onblur="document.getElementById( 'divAdvancedSearch' ).style.display = 'none'">
+                    جستجوی پیشرفته
+                </a>
+            </div>
+            <script type="text/ecmascript">
+
+                function searchTextOnblur()
+                {
+                    setTimeout( function () { document.getElementById( 'divAdvancedSearch' ).style.display = 'none'; }, 500 );
+                }
+
+            </script>
+        <dl class="arrows-left">
+            <input id="workSpaceNavPanelDefault" type="hidden" name="name" value=Inbox />
+            <dt data-menuitemindex="0" data-filter-entitytype="all" data-cardtable-type=Inbox class="item empty  selected" data-objectListMode="Current">
+                <span class="arrow-holder"></span>
+                <a href="" onclick="return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=Current" class="item-title with-count" data-title="جاری">
+                    <div>
+                        <span class="title">جاری</span>
+                            <span class="unread-count"></span>
+
+                    </div>
+                </a>
+            </dt>
+            <dd class="hidden">
+                <ul>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="پیش نویس ها">پیش نویس ها</a>
+                        </li>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="نامه ها">نامه ها</a>
+                        </li>
+                        <li class="item">
+                            <a href="" onclick="return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=ReferNotifyToMe" class="item-title" data-title="یادداشت های اداری">یادداشت های اداری</a>
+                            
+                        </li>
+                    <li class="item">
+                        <a href="#" class="item-title" data-title="فرم های اداری">فرم های اداری</a>
+                    </li>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="فرم های سازمانی">فرم های سازمانی</a>
+                        </li>
+                </ul>
+            </dd>
+
+            <dt data-menuitemindex="1"  data-filter-entitytype="all" data-cardtable-type=FollowUp class="item empty" data-objectListMode="FollowUp">
+                <span class="arrow-holder"></span>
+                <a href="" onclick="return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=FollowUp" class="item-title with-count" data-title="پیگیری ها">
+                    <div>
+                        <span class="title">پیگیری ها</span>
+                            <span class="unread-count"></span>
+
+                    </div>
+                </a>
+            </dt>
+            <dd class="hidden">
+                <ul>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="پیش نویس ها">پیش نویس ها</a>
+                        </li>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="نامه ها">نامه ها</a>
+                        </li>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="یادداشت های اداری">یادداشت های اداری</a>
+                        </li>
+                    <li class="item">
+                        <a href="#" class="item-title" data-title="فرم های اداری">فرم های اداری</a>
+                    </li>
+                        <li class="item">
+                            <a href="#" class="item-title" data-title="فرم های سازمانی">فرم های سازمانی</a>
+                        </li>
+                </ul>
+            </dd>
+
+            <dt data-menuitemindex="2"  data-filter-entitytype="all" data-cardtable-type=BeingProcessing 
+                class="item" data-objectListMode="IsBeingProcessedByReceiver">
+                <span class="arrow-holder"></span>
+                <a href="" onclick="return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=IsBeingProcessedByReceiver" class="item-title with-count" data-title="در دست اقدام">
+                    <div>
+                        <span class="title">در دست اقدام</span>
+                            <span class="unread-count"></span>
+
+                    </div>
+                </a>
+            </dt>
+            <dd class="hidden">
+                <ul id="being-processing-categories">
+                    <li id="being-processing-new-folder">
+                        <input id="new-folder-name" type="text" />
+                        <a id="new-folder-link" href="#">پوشه جدید</a>
+                    </li>
+                </ul>
+            </dd>
+        </dl>
+
+
+        
+    </nav>
+</div>
+
+            </div>
+
+        </div>
+
+<link href=/Content/_NavigationPanel.css?ver=639193537312330684 rel="stylesheet" />
+
+
+
+<div id="sideBarRemain" class="mobile-wsn-nav-wrapper hide show-in-mobile"></div>
+<div id="mobile-oa-nav-parent" class="mobile-wsn-nav-wrapper hide show-in-mobile" data-for="cardtable">
+	<nav id="mobile-oa-nav" class="wsn-nav">
+		<div id="mobile-oa-nav-header">
+			<div id="workspace" class="selected" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showNavigationMenuItems( this );">
+				کارتابل
+			</div>
+			<div id="draft" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showNavigationMenuItems( this );">
+				پیش نویس
+			</div>
+			<div id="archive" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showNavigationMenuItems( this );">
+				بایگانی
+			</div>
+			<div id="headerSplitter">
+
+			</div>
+			<div id="currentPerson">
+				محمد جواد ابوالحسني فر - كارشناس فن آوري اطلاعات شركت آتيه سازان اميد نسل امروز(ستاد-مديريت فناوري اطلاعات)
+			</div>
+		</div>
+		<div id="CardtableMobileView" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.hideMobileNavigationMenu( );">
+			<div id="CardtablPanel" class="CardtablePanel">
+				
+				
+				<div data-menuitemindex="0" data-filter-entitytype="all" data-cardtable-type=Inbox class="item empty  selected" data-objectListMode="Current">
+					<a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu( ); return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=Current" class="item-title with-count" data-title="جاری">
+						<div>
+							<span class="title">جاری</span>
+						</div>
+					</a>
+				</div>
+
+				<div data-menuitemindex="1" data-filter-entitytype="all" data-cardtable-type=FollowUp class="item empty" data-objectListMode="FollowUp">
+					<a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu(); return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=FollowUp" class="item-title with-count" data-title="پیگیری">
+						<div>
+							<span class="title">پیگیری</span>
+						</div>
+					</a>
+				</div>
+
+				<div data-menuitemindex="2" data-filter-entitytype="all" data-cardtable-type=BeingProcessing class="item" data-objectListMode="IsBeingProcessedByReceiver">
+					<a href="" onclick="if (psg.views.shared != undefined) { psg.views.shared.layout.showMobileNavigationMenu(); psg.views.shared.layout.showMobileBeingProcessing(); } return false;" data-main-url="/OA/WorkSpace/ItemList?objectListMode=IsBeingProcessedByReceiver" class="item-title with-count" data-title="در دست اقدام">
+						<div style="display:inline-block">
+							<span class="title">در دست اقدام</span>
+						</div>
+					</a>
+					<div Id="selectSubMenu" class="image" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileBeingProcessing();"></div>
+				</div>
+				<div class="BeingProcessing">
+				</div>
+			</div>
+            
+            <div id="DraftPanel" class="DraftPanel hide-Panel"">
+                <div data-menuitemindex="3" data-filter-entitytype="all" data-cardtable-type="DraftLetter" class="item empty  " data-objectListMode="DraftBox">
+                    <a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu( ); return false;" data-main-url="/OA/Draft/ItemList?objectListMode=DraftBox" class="item-title with-count" data-title="نامه">
+                        <div>
+                            <span class="title">نامه</span>
+                        </div>
+                    </a>
+                </div>
+
+                <div data-menuitemindex="4" data-filter-entitytype="all" data-cardtable-type="DraftMemorandum" class="item empty " data-objectListMode="DraftMemorandum">
+                    <a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu(); return false;" data-main-url="/OA/Draft/ItemList?objectListMode=DraftMemorandum" class="item-title with-count" data-title="یادداشت اداری">
+                        <div>
+                            <span class="title">یادداشت اداری</span>
+                        </div>
+                    </a>
+                </div>
+                
+                <div data-menuitemindex="5" data-filter-entitytype="all" data-cardtable-type="DraftUnstructuredForm" class="item empty " data-objectListMode="DraftUnstructuredForm">
+                    <a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu(); return false;" data-main-url="/OA/Draft/ItemList?objectListMode=DraftUnstructuredForm" class="item-title with-count" data-title="فرم اداری">
+                        <div>
+                            <span class="title">فرم اداری</span>
+                        </div>
+                    </a>
+                </div>
+                
+            </div>
+			
+			<div id="ArchiveNavigationPanel" class="ArchivePanel hide-Panel">
+				<div data-menuitemindex="6" data-filter-entitytype="all" data-cardtable-type="PrivateArchive" class="item empty" data-objectListMode="PrivateArchive">
+					<a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu( ); return false;" data-main-url="/OA/Archive/ArchiveItemList?objectListMode=PrivateArchive" class="item-title with-count" data-title="شخصی">
+						<div>
+							<span class="title">شخصی</span>
+						</div>
+					</a>
+				</div>
+
+				<div data-menuitemindex="7" data-filter-entitytype="all" data-cardtable-type="PersonalArchive" class="item empty  " data-objectListMode="PersonalArchive">
+					<a href="" onclick="if( psg.views.shared != undefined ) psg.views.shared.layout.showMobileNavigationMenu( ); return false;" data-main-url="/OA/Archive/ArchiveItemList?objectListMode=PersonalArchive" class="item-title with-count" data-title="پست سازمانی">
+						<div>
+							<span class="title">پست سازمانی</span>
+						</div>
+					</a>
+				</div>
+				
+				
+                			</div>			
+			<div class="item empty" style="line-height: 55px;padding-right: 11px;position: absolute;bottom: 0;width: 100%;max-width: 274px;border-top: 1px solid #E0E0E0; ">
+				<a id="logoutMobile" href="" class="with-count">
+					<div>
+                        <span style="float: right;width: 20px;background-image: url('../../images/signout.responsive.png'); height: 30px;background-repeat: no-repeat;margin-top: 20px;margin-left: 9px;background-size: 20px;"></span>
+						<span style="font-family: Iran Sans Web, Tahoma, DownloadTahoma; font-size: 9.25pt;font-weight: bold;color: #595959;white-space: nowrap;">خروج</span>
+					</div>
+				</a>
+			</div>
+		</div>
+	</nav>
+</div>
+
+
+        
+<script src="/Scripts/Libs/calendar.js"></script>
+            <script type="text/javascript">
+                require( ['oa/initapp'],
+                function ()
+                {
+                    require( ['jquery.ui.datepicker-cc', 'jquery.ui.datepicker-cc-fa'] );
+                } );
+            </script>
+
+        <div id="bodyContainer" data-psg-view="main">
+            
+        </div>
+    </section>
+
+    
+
+    <div id="hide-services"></div>
+    <div id="services">
+        <ul>
+
+
+                <li>
+                    <a id="cardtable-link" href="/OA/workspace/itemlist" data-for="cardtable" class="service-link" >
+                        <span>کارتابل</span>
+                    </a>
+                </li>
+                            <li>
+                    <a id="draft-link" href="/OA/Draft/itemlist" data-for="draft" class="service-link" >
+                        <span>پیش نویس</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a id="archive-link" href="/OA/Archive/ArchiveItemList" data-for="archive" class="service-link" >
+                        <span>بایگانی</span>
+                    </a>
+                </li>
+
+
+                                                        <li>
+                        <a id="pb-link" href="/pb/" data-for="pb" class="service-link" data-external-link>
+                            <span>صندوق پستی</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a id="history-link" href="/OA/History/HistoryItemList" data-for="history" class="service-link">
+                            <span>تاریخچه</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a id="calendar-link" href="/Calendar/" data-for="calendar" class="service-link">
+                            <span>تقویم</span>
+                        </a>
+                    </li>
+        </ul>
+    </div>
+<form action="/User/LogOff?ReturnUrl=..%2FOA%2Fworkspace%2Fitemlist%3FobjectListMode%3DCurrent" id="logoutForm" method="post"><input name="__RequestVerificationToken" type="hidden" value="VJPl-Xco-ud0LHyNjiDMhPR8FsTjhxhmYLtHARruFjNORNcNe2BVe9bXhS6gTQhVXoxmsfd9iXADzWJ_kGy4Crr-ddbiIG3wmOMR0zZlUHOQikTAc-b49BYdINakqqA7778xerU8Q_kkFm7sNUM4Vg2" /></form></body>
+</html>
+

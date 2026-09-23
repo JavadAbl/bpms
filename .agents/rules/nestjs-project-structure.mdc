@@ -1,0 +1,40 @@
+---
+description: NestJS template folder layout — config, infrastructure, libs, modules
+alwaysApply: true
+---
+
+# Project Structure
+
+Follow this layout. Do not invent alternate homes for these concerns.
+
+| Concern | Path | Purpose |
+|---------|------|---------|
+| Config | `src/common/config/` | Env-backed Nest config (`configs/*.config.ts`, `config.type.ts`, `envs.ts`) |
+| Infrastructure | `src/common/infrastructure/` | Persistence & other infra bridges (e.g. Prisma, `base.repository.ts`) |
+| External libs | `src/common/libs/` | Third-party wiring (Pino, Swagger, i18n) |
+| Shared DTO/utils | `src/common/dto/`, `src/common/utils/` | Cross-cutting helpers (`GetManyQuery`, `buildFindManyArgs`) |
+| Domain modules | `src/modules/<domain>/` | Feature code only |
+
+## Config pattern
+
+- Add new settings under `src/common/config/configs/<name>.config.ts` with `registerAs`, Joi validation schema, and exported config type.
+- Register the loader + schema in `AppModule` `ConfigModule.forRoot` and extend `Configs` in `config.type.ts`.
+
+## Libs vs infrastructure
+
+- **Libs**: wrap/configure an external package (logger, swagger UI).
+- **Infrastructure**: app persistence/adapters that domain modules depend on (Prisma module/provider, generic `Repository`).
+
+## Module folder layout
+
+```
+src/modules/<domain>/
+  controllers/
+  services/
+  repositories/
+  dto/request/
+  dto/response/
+  contracts/       # abstract API for other modules
+  providers/       # implementations of contracts
+  <domain>.module.ts
+```

@@ -6,6 +6,6 @@ import { ReportsView } from '@/components/views/reports-view';
 export default function AdminReportsPage() {
   const router = useRouter();
   return (
-    <ReportsView onViewInstance={(id) => router.push(`/instances/${id}`)} />
+    <ReportsView onViewInstance={(id) => router.push(`/cases/${id}`)} />
   );
 }

@@ -5,6 +5,7 @@ import { getToken, setToken, authApi, usersApi } from './api';
 
 interface AuthUser {
   userId: string;
+  username: string;
   email: string;
   name: string;
   role: string;
@@ -13,7 +14,7 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const payload = JSON.parse(atob(token.split('.')[1]));
       decoded = {
         userId: payload.sub,
+        username: payload.username,
         email: payload.email,
         role: payload.role,
       };
@@ -75,8 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const persisted = readPersistedUserInfo();
     const initial: AuthUser = {
       userId: decoded.userId ?? '',
+      username: decoded.username ?? persisted?.username ?? '',
       email: decoded.email ?? '',
-      name: persisted?.name ?? decoded.email ?? '',
+      name: persisted?.name ?? decoded.username ?? decoded.email ?? '',
       role: decoded.role ?? 'USER',
     };
     setUser(initial);
@@ -86,12 +89,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (initial.userId) {
           const fresh = (await usersApi.findOne(initial.userId)) as {
             id: string;
+            username: string;
             email: string;
             name: string;
             role: string;
           };
           const next: AuthUser = {
             userId: fresh.id,
+            username: fresh.username,
             email: fresh.email,
             name: fresh.name,
             role: fresh.role,
@@ -110,11 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const res = await authApi.login(email, password);
+  const login = async (username: string, password: string) => {
+    const res = await authApi.login(username, password);
     setToken(res.accessToken);
     const u: AuthUser = {
       userId: res.userId,
+      username: res.username,
       email: res.email,
       name: res.name,
       role: res.role,

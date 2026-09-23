@@ -270,7 +270,7 @@ export function DashboardView({
               label={t.kpiRunningInstances}
               value={data.runningInstances}
               tint="bg-warning/15 text-warning"
-              href="/instances"
+              href="/cases"
             />
             <KpiCard
               icon={Workflow}
@@ -284,7 +284,7 @@ export function DashboardView({
               label={t.kpiCompleted7d}
               value={completed7dTotal}
               tint="bg-success/15 text-success"
-              href="/instances"
+              href="/cases"
             />
           </>
         )}
@@ -495,7 +495,7 @@ export function DashboardView({
             <div className="flex items-center justify-between gap-2 mb-3">
               <h3 className="font-semibold">{t.recentInstances}</h3>
               <Link
-                href="/instances"
+                href="/cases"
                 className="text-xs text-primary font-medium flex items-center gap-0.5 hover:underline"
               >
                 {t.viewAll}
@@ -558,7 +558,7 @@ export function DashboardView({
               </CardContent>
             </Card>
           </Link>
-          <Link href="/instances?start=1">
+          <Link href="/cases?start=1">
             <Card className="state-layer h-full transition-shadow hover:shadow-elev-2">
               <CardContent className="p-5 flex items-center gap-4">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-success/15 text-success">
@@ -570,7 +570,7 @@ export function DashboardView({
             </Card>
           </Link>
           {isAdmin ? (
-            <Link href="/instances">
+            <Link href="/cases">
               <Card className="state-layer h-full transition-shadow hover:shadow-elev-2">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-warning/15 text-warning">

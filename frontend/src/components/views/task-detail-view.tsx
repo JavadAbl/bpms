@@ -203,22 +203,25 @@ export function TaskDetailView({ taskId, onBack }: Props) {
 
   if (!task) return null;
 
+  const assigneeId: string | null | undefined = task.assigneeId ?? task.assignee?.id ?? null;
+  const positionId: string | null | undefined = task.positionId ?? task.position?.id ?? null;
+
   const canClaim =
     task.selfService &&
-    !task.assigneeId &&
-    task.positionId &&
+    !assigneeId &&
+    !!positionId &&
     task.status === 'PENDING';
 
   const canRelease =
     task.selfService &&
-    task.assigneeId === user?.userId &&
+    assigneeId === user?.userId &&
     task.status === 'PENDING';
 
   const canComplete =
     task.status === 'PENDING' &&
-    (task.assigneeId === user?.userId ||
-      (!task.selfService && task.positionId && !task.assigneeId) ||
-      (!task.assigneeId && !task.positionId));
+    (assigneeId === user?.userId ||
+      (!task.selfService && !!positionId && !assigneeId) ||
+      (!assigneeId && !positionId));
 
   const fields = task.form?.fields || [];
   const instanceId: string | undefined =
@@ -378,7 +381,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
                       {t.complete}
                     </Button>
                   </div>
-                ) : task.selfService && !task.assigneeId ? (
+                ) : task.selfService && !assigneeId ? (
                   <p className="text-sm text-warning bg-warning/10 p-3 rounded-lg">
                     {t.claimFirstHint}
                   </p>
@@ -413,7 +416,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground mb-1">{t.instanceInfo}</p>
                 <button
-                  onClick={() => router.push(`/instances/${instanceId}`)}
+                  onClick={() => router.push(`/cases/${instanceId}`)}
                   className="group flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 -mx-2 text-sm font-medium text-primary hover:bg-primary/8 transition-colors"
                 >
                   <span className="truncate">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BarChart3,
   Pencil,
@@ -32,7 +33,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { DataTable } from '@/components/common/data-table';
 import { useToast } from '@/hooks/use-toast';
-import { ReportBuilderDialog } from '@/components/reports/report-builder-dialog';
 import { ReportRunnerDialog } from '@/components/reports/report-runner-dialog';
 
 interface Props {
@@ -40,18 +40,17 @@ interface Props {
 }
 
 /**
- * گزارش‌ساز (v6) — admin report builder landing page.
- * Lists the saved report definitions; «ایجاد گزارش» opens the builder
- * (process → columns → filters → preview → save), and each row runs /
- * edits / deletes. ADMIN-only route (guarded by the /admin layout).
+ * گزارش‌ساز (v7) — admin report builder landing page.
+ * Lists the saved report definitions; «ایجاد گزارش» / edit navigate to the
+ * full-page builder at /admin/reports/build, and each row runs / deletes.
+ * ADMIN-only route (guarded by the /admin layout).
  */
 export function ReportsView({ onViewInstance }: Props) {
+  const router = useRouter();
   const { toast } = useToast();
   const [reports, setReports] = useState<ReportDefinition[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [editing, setEditing] = useState<ReportDefinition | null>(null);
   const [running, setRunning] = useState<ReportDefinition | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReportDefinition | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -169,10 +168,7 @@ export function ReportsView({ onViewInstance }: Props) {
             size="small"
             aria-label={t.editReport}
             title={t.editReport}
-            onClick={() => {
-              setEditing(p.row as unknown as ReportDefinition);
-              setBuilderOpen(true);
-            }}
+            onClick={() => router.push(`/admin/reports/build?id=${p.row.id as string}`)}
           >
             <Pencil fontSize="small" />
           </IconButton>
@@ -220,10 +216,7 @@ export function ReportsView({ onViewInstance }: Props) {
           </Button>
           <Button
             size="sm"
-            onClick={() => {
-              setEditing(null);
-              setBuilderOpen(true);
-            }}
+            onClick={() => router.push('/admin/reports/build')}
           >
             <Plus className="w-4 h-4 ml-2" />
             {t.createReport}
@@ -244,10 +237,7 @@ export function ReportsView({ onViewInstance }: Props) {
             </div>
             <Button
               size="sm"
-              onClick={() => {
-                setEditing(null);
-                setBuilderOpen(true);
-              }}
+              onClick={() => router.push('/admin/reports/build')}
               className="gap-1.5"
             >
               <Plus className="w-4 h-4" />
@@ -264,17 +254,6 @@ export function ReportsView({ onViewInstance }: Props) {
           emptyTitle={t.noReports}
         />
       )}
-
-      {/* Builder (create / edit) */}
-      <ReportBuilderDialog
-        open={builderOpen}
-        onOpenChange={(open) => {
-          setBuilderOpen(open);
-          if (!open) setEditing(null);
-        }}
-        report={editing}
-        onSaved={() => load()}
-      />
 
       {/* Runner (execute + CSV export) */}
       <ReportRunnerDialog

@@ -71,10 +71,8 @@ interface ProcessVariableRef {
 interface Props {
   form: any | null;
   processId: string;
-  /** Process-level predefined variables (متغیرها tab) */
+  /** Process-variables registry — the single source of bindable variables */
   processVariables?: ProcessVariableRef[];
-  /** All bindable variables including other forms */
-  existingVariables?: { name: string; type: string; formName: string; label: string }[];
   onProcessVariablesChange?: (vars: ProcessVariableRef[]) => void;
   onClose: () => void;
   onSaved: () => void;
@@ -86,7 +84,6 @@ export function FormBuilderPanel({
   form,
   processId,
   processVariables = [],
-  existingVariables = [],
   onProcessVariablesChange,
   onClose,
   onSaved,
@@ -127,17 +124,11 @@ export function FormBuilderPanel({
     patchField(index, { [key]: value });
   };
 
-  const predefinedOptions = [
-    ...processVariables.map((v) => ({
-      name: v.name,
-      type: v.type,
-      formName: 'فرآیند',
-      label: v.label || v.name,
-    })),
-    ...existingVariables.filter(
-      (v) => !processVariables.some((pv) => pv.name === v.name),
-    ),
-  ].filter((v, i, arr) => arr.findIndex((x) => x.name === v.name) === i);
+  const predefinedOptions = processVariables.map((v) => ({
+    name: v.name,
+    type: v.type,
+    label: v.label || v.name,
+  }));
 
   const bindFieldToVariable = (index: number, varName: string) => {
     const picked = predefinedOptions.find((v) => v.name === varName);
@@ -364,7 +355,7 @@ export function FormBuilderPanel({
                             <SelectItem key={v.name} value={v.name}>
                               <span className="font-mono text-xs" dir="ltr">{v.name}</span>
                               <span className="text-muted-foreground/80 text-xs mr-2">
-                                ({v.label} — {v.formName})
+                                ({v.label})
                               </span>
                             </SelectItem>
                           ))}

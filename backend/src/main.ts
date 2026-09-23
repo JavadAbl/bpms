@@ -1,125 +1,151 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from './app.module.js';
+import { ExpressAdapter, NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import * as net from 'net';
-import * as path from 'path';
-import { spawn } from 'child_process';
-import { AppModule } from './app.module';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
+import { Logger as PinoLogger } from 'nestjs-pino';
+import chalk from 'chalk';
+import { AppConfigs, isDev, isProd } from '#common/config/configs/app.config.js';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Configs } from '#common/config/config.type.js';
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  // Use global prefix so all routes live under /api
-  app.setGlobalPrefix('api');
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, new ExpressAdapter(), {
+    bufferLogs: true,
+  });
+
+  app.useLogger(app.get(PinoLogger));
+  app.set('query parser', 'extended');
+
+  const configService = app.get(ConfigService<Configs, true>);
+
+  // =========================================================
+  // configure swagger
+  // =========================================================
+  if (!isProd()) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('BPMS Backend API')
+      .setDescription(
+        'MVP Business Process Management System backend.\n\n' +
+          '## Overview\n' +
+          '- **Admin** creates process definitions by uploading BPMN 2.0 XML.\n' +
+          '- Admin binds each userTask (by name) to a **user** and/or a **dynamic form**.\n' +
+          '- Users **start** instances of a process; the BPMN engine executes it.\n' +
+          '- When the engine reaches a userTask, a **Task** is created and assigned.\n' +
+          '- Assigned users **complete** the task by submitting the bound form; the engine advances.\n\n' +
+          '## Auth\n' +
+          'Use `POST /api/auth/login` to obtain a JWT, then click **Authorize** and paste it.\n\n' +
+          '## Seeded accounts\n' +
+          '- `admin` / `admin123` (ADMIN)\n' +
+          '- `john` / `user123` (USER — requester)\n' +
+          '- `jane` / `user123` (USER — IT expert)\n' +
+          '- `ali` / `user123` (USER — IT expert)\n' +
+          '- `bob` / `user123` (USER — IT manager)\n\n' +
+          '## Conventions\n' +
+          '- List endpoints accept `page`, `pageSize`, `sortBy`, `sortOrder`, `search` query params\n' +
+          '  and return the envelope `{ items, totalCount }`.\n',
+      )
+      .setVersion('0.2.0')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', name: 'Authorization' },
+        'access-token',
+      )
+      .build();
+
+    const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, documentFactory, { swaggerOptions: { persistAuthorization: true } });
+  }
+
+  // ======================================================
+  // security and middlewares
+  // ======================================================
+
+  app.enable('trust proxy');
+  app.set('etag', 'strong');
+
+  // Next.js (:3000) and the OA extension (https://oa.*) call this API
+  // cross-origin. Chrome Local Network Access also sends a private-network
+  // preflight when a public HTTPS page talks to localhost — allow that.
+  app.use((req: any, res: any, next: any) => {
+    if (req.headers['access-control-request-private-network'] === 'true') {
+      res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    }
+    next();
+  });
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
+
+  // =====================================================
+  // configure global pipes, filters, interceptors
+  // =====================================================
+  const globalPrefix = 'api';
+  app.setGlobalPrefix(globalPrefix);
 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false,
+      forbidUnknownValues: false,
+      validateCustomDecorators: true,
+      enableDebugMessages: isDev(),
     }),
   );
 
-  app.enableCors({ origin: true, credentials: true });
+  // =========================================================
+  // configure shutdown hooks
+  // =========================================================
 
-  // Swagger setup
-  const config = new DocumentBuilder()
-    .setTitle('BPMS Backend API')
-    .setDescription(
-      'MVP Business Process Management System backend.\n\n' +
-        '## Overview\n' +
-        '- **Admin** creates process definitions by uploading BPMN 2.0 XML.\n' +
-        '- Admin binds each userTask (by name) to a **user** and/or a **dynamic form**.\n' +
-        '- Users **start** instances of a process; the BPMN engine executes it.\n' +
-        '- When the engine reaches a userTask, a **Task** is created and assigned.\n' +
-        '- Assigned users **complete** the task by submitting the bound form; the engine advances.\n\n' +
-        '## Auth\n' +
-        'Use `POST /api/auth/login` to obtain a JWT, then click **Authorize** and paste it.\n\n' +
-        '## Seeded accounts\n' +
-        '- `admin@bpms.local` / `admin123` (ADMIN)\n' +
-        '- `john@bpms.local` / `user123` (USER)\n' +
-        '- `jane@bpms.local` / `user123` (USER)\n' +
-        '- `bob@bpms.local` / `user123` (USER)\n\n' +
-        '## Seeded processes\n' +
-        '- **Leave Approval** (exclusive gateway): Sick → auto-approve, Annual → manager approval\n' +
-        '- **Expense Approval** (inclusive + parallel gateways): amount ≤ 1000 → manager, > 1000 → director, > 5000 → also compliance; then parallel payment + archive',
-    )
-    .setVersion('0.1.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', name: 'Authorization' },
-      'access-token',
-    )
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: { persistAuthorization: true },
+  app.enableShutdownHooks();
+
+  process.on('SIGINT', async () => {
+    await gracefulShutdown(app, 'SIGINT');
   });
 
-  const configService = app.get(ConfigService);
-  // Backend owns port 3001 (frontend Next.js owns 3000).
-  // The sandbox exports a global PORT=3000 which must NOT hijack the backend,
-  // so ignore a configured PORT of 3000 unless BACKEND_PORT says otherwise.
-  const configuredPort =
-    configService.get<number>('BACKEND_PORT') || configService.get<number>('PORT');
-  const port = !configuredPort || configuredPort === 3000 ? 3001 : configuredPort;
+  process.on('SIGTERM', async () => {
+    await gracefulShutdown(app, 'SIGTERM');
+  });
+
+  const port = configService.get<AppConfigs>('app').port;
 
   await app.listen(port);
-  new Logger('Bootstrap').log(`🚀 BPMS backend ready at http://localhost:${port}/api`);
-  new Logger('Bootstrap').log(`📚 Swagger UI at http://localhost:${port}/api/docs`);
 
-  await ensureFrontendRunning();
-  // supervisor re-run note: idempotent probe keeps frontend alive across watch restarts
-}
+  const appUrl = `http://localhost:${port}/${globalPrefix}`;
 
-/**
- * Sandbox glue: keep the Next.js frontend alive alongside the backend.
- *
- * The sandbox reaps processes spawned from one-off tool shells, so the
- * frontend is spawned here instead — it becomes a child of the long-lived
- * supervisor tree (detached into its own process group, orphaned to init).
- * A port probe keeps this idempotent across `nest start --watch` restarts.
- */
-async function ensureFrontendRunning(): Promise<void> {
-  const logger = new Logger('FrontendSupervisor');
-  const frontendPort = 3000;
-  const inUse = await new Promise<boolean>((resolve) => {
-    const probe = net.createConnection(frontendPort, '127.0.0.1');
-    probe.on('connect', () => {
-      probe.destroy();
-      resolve(true);
-    });
-    probe.on('error', () => {
-      probe.destroy();
-      resolve(false);
-    });
-  });
-  if (inUse) {
-    logger.log(`Port ${frontendPort} already serving — frontend assumed running`);
-    return;
+  logger.log(`==========================================================`);
+  logger.log(`🚀 Application is running on: ${chalk.green(appUrl)}`);
+
+  logger.log(`==========================================================`);
+
+  if (!isProd()) {
+    const swaggerUrl = `http://localhost:${port}/api/docs`;
+    logger.log(`==========================================================`);
+    logger.log(`📑 Swagger is running on: ${chalk.green(swaggerUrl)}`);
   }
-  try {
-    // Frontend dir: env override first, else the sibling `frontend/` of this
-    // backend checkout (works from dist/main.js in any relocated checkout).
-    const frontendDir =
-      process.env.FRONTEND_DIR || path.resolve(__dirname, '..', '..', 'frontend');
-    const child = spawn(
-      process.execPath,
-      ['node_modules/next/dist/bin/next', 'dev', '-p', String(frontendPort)],
-      {
-        cwd: frontendDir,
-        env: process.env,
-        stdio: 'ignore',
-        detached: true, // own process group — survives backend watch restarts
-      },
-    );
-    child.unref();
-    logger.log(`Spawned Next.js dev server on :${frontendPort} from ${frontendDir} (pid ${child.pid})`);
-  } catch (err) {
-    logger.error(`Failed to spawn frontend: ${err}`);
+
+  async function gracefulShutdown(app: INestApplication, code: string) {
+    setTimeout(() => process.exit(1), 5000);
+    logger.verbose(`Signal received with code ${code} ⚡.`);
+    logger.log('❗Closing http server with grace.');
+
+    try {
+      await app.close();
+      logger.log('✅ Http server closed.');
+      process.exit(0);
+    } catch (error: unknown) {
+      logger.error(`❌ Http server closed with error: ${error}`);
+      process.exit(1);
+    }
   }
 }
 
-bootstrap().catch((err) => {
-  console.error('Failed to bootstrap', err);
-  process.exit(1);
-});
+try {
+  (async () => bootstrap())();
+} catch (error) {
+  logger.error(error);
+}

@@ -111,7 +111,7 @@ export function TasksView({ onViewTask }: Props) {
       renderCell: (p) => (
         <span className="flex items-center gap-2 truncate">
           <span className="truncate font-semibold">{p.row.name}</span>
-          {p.row.selfService && !p.row.assigneeId && (
+          {p.row.selfService && !(p.row.assigneeId ?? p.row.assignee?.id) && (
             <Chip
               size="small"
               label={t.selfService}
@@ -188,7 +188,7 @@ export function TasksView({ onViewTask }: Props) {
       sortable: false,
       renderCell: (p) => (
         <span className="flex items-center gap-1">
-          {p.row.selfService && !p.row.assigneeId && (
+          {p.row.selfService && !(p.row.assigneeId ?? p.row.assignee?.id) && (
             <IconButton
               size="small"
               aria-label={t.claim}

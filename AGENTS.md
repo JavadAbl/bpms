@@ -1,141 +1,62 @@
-# AGENTS.md — BPMS (Business Process Management System)
+# AGENTS.md — BPMS
 
-**Read this file first.** It is the entry point for any human or AI agent continuing work on this project. Detailed docs live in [`docs/`](docs/); the full multi-agent history lives in [`worklog.md`](worklog.md) (append-only — always add your entry at the end, never overwrite).
+Business Process Management System (MVP): NestJS backend + Next.js frontend. Monorepo with two independent npm packages — there is no root package.json; run all commands from `backend/` or `frontend/`.
 
-## 1. What this is
+## Layout
 
-A high-level BPMS in the spirit of ProcessMaker/Camunda, but **declarative — no triggers, no low-level scripting for process designers**:
+- `backend/` — NestJS 12 (ESM), Prisma 7 + `@prisma/adapter-better-sqlite3`, `bpmn-engine`. SQLite DB at `backend/db/bpms.db`.
+- `frontend/` — Next.js 16 (App Router), React 19, Tailwind 4, shadcn/Radix + MUI, `bpmn-js`, TanStack Query, Zustand.
+- `.agents/rules/*.mdc` — NestJS layout & naming conventions. **Read these before touching backend modules.**
+- `compose.yml` — Docker: backend :3001, frontend :3000 (Unix-style scripts; run on Linux/macOS/Git Bash or Docker, not plain cmd).
 
-- Design BPMN 2.0 diagrams in an embedded bpmn-js designer (Persian RTL UI)
-- Bind tasks to users/positions with **declarative assignment strategies** (including "manager of the performer of a chosen earlier task")
-- Route through **XOR/inclusive gateways with validated JavaScript conditions**
-- Build dynamic forms (text/number/date/select/checkbox/**file uploads**) with reusable option categories
-- Run instances with persistent engine state, crash recovery, task queues, claim/release
-- **Immutable process versioning** with restore-as-append and instance pinning
-- **Admin report builder (گزارش‌ساز, v6)** — per-process tabular reports over instance
-  data + variables with declarative filters, live execution and CSV export
+## Commands
 
-Version: **1.0** (feature-complete MVP; see `docs/development-guide.md` §8 for scope and known gaps).
-
-## 2. Repository map
-
-```
-frontend/     Next.js 16 app (this is the OLD repo root layout — see below)
-backend/      NestJS 11 API + Prisma/SQLite + bpmn-engine
-docs/         Architecture, domain semantics, API reference, development guide
-scripts/      E2E test suites (node scripts/*.cjs) + one-off helpers
-worklog.md    Append-only multi-agent work history — READ IT, then APPEND to it
-AGENTS.md     This file
-```
-
-> In the original workspace the frontend lives at the project root (`src/`, `next.config.ts`, …) and the backend at `mini-services/bpms-backend/`. The zip ships them as `frontend/` and `backend/`. All paths in the docs are relative to this layout.
-
-## 3. Quick start
+Backend (from `backend/`):
 
 ```bash
-# Backend (terminal 1) — port 3001, watch mode
-cd backend
-cp .env.example .env                    # then fix DATABASE_URL to an ABSOLUTE path (see §5)
-npm install && npx prisma generate
-npx prisma migrate deploy               # creates db/bpms.db (SQLite)
-npm run prisma:seed                     # seeds org structure + Persian demo process
-npm run dev                             # nest start --watch on :3001
-
-# Frontend (terminal 2) — port 3000
-cd frontend
-npm install
-npm run dev                             # Next dev on :3000 (proxies /api/* → :3001)
+npm run dev            # nest start --watch (port 3001)
+npm run build          # nest build
+npm run lint           # oxlint src/ test/
+npm run format         # prettier
+npm run test           # vitest run (unit)
+npm run test:e2e       # vitest --config vitest.config.e2e.ts
+npm run prisma:generate   # REQUIRED after schema edits; client is generated into src/common/infrastructure/database/generated/prisma (gitignored)
+npm run prisma:migrate    # dev migrations
+npm run prisma:seed       # seed users: admin/admin123, john|jane|ali|bob/user123
 ```
 
-Open http://localhost:3000 — Persian RTL login. Swagger: http://localhost:3001/api/docs (or :3000/api/docs through the proxy).
-
-**Seeded accounts** (users are preserved by the seed, everything else is wiped and recreated):
-
-| Email | Password | Role | Notes |
-|---|---|---|---|
-| admin@bpms.local | admin123 | ADMIN | No position (tests fallback paths) |
-| john@bpms.local | user123 | USER | کارشناس فنی @ مهندسی |
-| jane@bpms.local | user123 | USER | مدیر مهندسی (isManager) + کارشناس مالی |
-| bob@bpms.local | user123 | USER | مدیر منابع انسانی (isManager) |
-
-Login response field is **`accessToken`** (not `access_token`).
-
-## 4. The one thing you must not get wrong: gateway conditions
-
-The engine (bpmn-engine v25) only evaluates conditions in this exact shape:
-
-```xml
-<bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="javascript">
-next(null, environment.variables.leaveType === 'Sick');
-</bpmn:conditionExpression>
-```
-
-- `language="javascript"` is mandatory — without it the engine silently takes the FIRST outgoing flow (classic bug).
-- The body MUST call `next(null, <expr>)` or the gateway hangs forever.
-- Variables are read from `environment.variables.<name>`; form data is merged into engine variables at task completion (mapped via `field.variable || field.name`).
-- Three validation layers enforce this: the condition modal, frontend save/activate gate (`src/lib/condition-validation.ts`), backend validator (`backend/src/bpmn/condition-validator.ts` wired into process create/update/activate).
-
-## 5. Environment quirks (learned the hard way — do not skip)
-
-1. **PORT hijack**: the workspace exports a global `PORT=3000`. The backend would bind 3000 and collide with Next.js. `backend/src/main.ts` ignores `PORT=3000` and falls back to **3001**; the dev script also pins `PORT=3001`. The `dev` script's `DATABASE_URL` is an **absolute path from the original workspace — point it at your checkout** (or export `DATABASE_URL` yourself) before running.
-2. **Global `DATABASE_URL` override**: if the shell exports `DATABASE_URL`, dotenv will NOT override it. Any direct `prisma migrate`/`ts-node prisma/seed.ts` run must pin it explicitly:
-   `DATABASE_URL=file:/absolute/path/to/backend/db/bpms.db npx prisma migrate dev`
-3. **Ephemeral shells**: background processes started from one-off shells may be reaped. The reliable way to (re)start the frontend is the backend's `FrontendSupervisor` (`backend/src/main.ts`): it probes `:3000` on boot and spawns Next.js detached if missing — so restarting the backend heals the whole stack.
-4. **nest --watch** restarts only on *real content changes*; `touch` alone does nothing. To force a reload of e.g. a regenerated Prisma client, make a trivial edit in `src/` or kill and rerun `npm run dev`.
-5. **Turbopack crashes / stale CSS**: `rm -rf frontend/.next` and restart the dev server. Never trust an old `dev.log`.
-6. **ValidationPipe(whitelist: true)** silently strips DTO properties without validation decorators. Every new optional property needs e.g. `@IsOptional() @IsBoolean()` — this bit us twice (form-field extras, `multiple`).
-7. **UI language**: every user-facing string is **Persian (fa), RTL**. Follow existing files (`t` helper in `src/lib/i18n.ts` or inline Persian strings).
-8. **Direct DB inspection**: use `DATABASE_URL=file:... npx prisma studio` or a small node script with an explicit datasource URL (see any `scripts/*.cjs`).
-
-## 6. Where things live (backend `src/`)
-
-| Module | Responsibility |
-|---|---|
-| `auth/` | JWT (passport-jwt), `ADMIN`/`USER` roles, RolesGuard |
-| `users/` `departments/` `positions/` | Org structure; `Position.isManager` drives manager resolution |
-| `processes/` | CRUD, BPMN user-task extraction, assignments (strategies), **starters** (START-event assignment, v4), variables, **version history** (list/detail/restore) |
-| `process-instances/` | Start instance (XML snapshot; **starter-permission gate, v4**), engine callbacks, **assignment resolution at task creation**, terminate, recovery on boot |
-| `tasks/` | Waiting-task creation, complete (form submission → engine signal), claim/release, `getInstanceVariables` prefill merge — **کارتابل endpoints return PENDING tasks only (v4); `/tasks/participated` (سوابق کارتابل) returns the caller's passed tasks (COMPLETED/CANCELLED), disjoint from the inbox** |
-| `forms/` | Form CRUD (JSON-schema fields), file-field `multiple` flag |
-| `categories/` | Reusable value/label option lists for selects (key is condition-safe) |
-| `files/` | Multipart upload (uuid disk names, UTF-8 name recovery), authenticated download, task/instance stamping |
-| `reports/` | **Report builder (v6)**: report CRUD, field-catalog (instance fields ∪ process variables), preview/execute (live rows) |
-| `bpmn/` | `BpmnEngineService` wrapper + `condition-validator.ts` |
-
-Frontend: `src/components/views/` (one per sidebar section), `src/components/processes/` (designer dialogs), `src/components/forms/` (builders), `src/components/reports/` (report builder + runner, v6), `src/components/common/` (dynamic-form, option-select, file-upload-field), `src/components/bpmn/` (designer canvas), `src/lib/api.ts` (typed API client).
-
-## 7. How to verify your work
-
-E2E suites hit the **real API** (backend must be running on :3001):
+Frontend (from `frontend/`):
 
 ```bash
-node scripts/test-persian-process-e2e.cjs          # seed regression: 3 leave paths
-node scripts/test-v4-features.cjs                  # v4 sign-off: starters + کارتابل + conditions + create-on-save (33 checks)
-node backend/scripts/test-v5-dashboard-scoping.cjs # v5 sign-off: dashboard KPIs fully user-scoped (startable processes incl.) — 23 checks
-node scripts/test-task-starter-assignment-e2e.cjs  # task-scoped assignment strategies (also recreates its demo process)
-node scripts/test-process-versioning-e2e.cjs       # versioning + restore + instance pinning (also recreates its demo process)
-node scripts/test-file-upload-e2e.cjs              # attachments: upload → submit → next user downloads
-node scripts/test-condition-validation.cjs         # save-gate rejects broken XML (9 checks)
-node backend/scripts/test-report-builder.cjs       # v6 sign-off: report builder — 53 checks (catalog, permissions, filters, live execution, CSV-grade data flow)
+npm run dev            # next dev -p 3000
+npm run build          # standalone output
+npm run lint           # eslint
 ```
 
-All suites print `✓ PASS / ✗ FAIL` lines and exit non-zero on failure. After seed changes, re-run the seed first (`npm run prisma:seed`). Browser-check UI work with an automation agent (login → task flow), and confirm zero console errors.
+There is no frontend typecheck gate: `next.config.ts` sets `typescript.ignoreBuildErrors: true` — run `npx tsc --noEmit` yourself before trusting TS correctness.
 
-**UI redesign notes (post Phase 7):** MD3 indigo tokens live in `src/app/globals.css`
-(light `#3B5BDB` / dark `#BAC3FF` mapped onto shadcn variable names) with next-themes
-dark mode; shell is app bar + drawer⇄rail + Ctrl+K palette; MUI DataGrid is confined to
-list routes via `src/components/common/data-table.tsx`. `/processes/:id/design` and
-`/admin/*` are ADMIN-only (client guards); login has one-click demo-account chips.
-`tsc` baseline: `docs/tsc-baseline-phase0.txt` (18 pre-existing errors — compare sets,
-never counts). Between phases: `rm -rf .next` + restart dev (Turbopack stale-CSS).
+## Backend architecture rules (enforced conventions)
 
-**Definition of done** (used throughout v1): E2E relevant to the touched feature passes; zero new `tsc` errors (there is a documented pre-existing baseline, see `docs/development-guide.md` §7); backend log free of new errors; UI strings Persian; `worklog.md` entry appended.
+- Subpath imports only: `#common/*` and `#modules/*` (defined in `package.json` `imports`). **Always use `.js` extensions** in relative/subpath imports (ESM).
+- Module layout: `src/modules/<domain>/{controllers,services,repositories,dto/request,dto/response,contracts,providers}/`. Existing domains: auth, bpmn, category, dashboard, department, file, form, health, position, process, process-instance, report, task, user.
+- Config goes in `src/common/config/configs/<name>.config.ts` (registerAs + Joi schema), registered in `AppModule` and typed in `config.type.ts`.
+- Persistence via repositories extending `Repository<'Model'>` from `#common/infrastructure/database/base.repository` — no raw Prisma in services.
+- Naming is **domain + verb**: `userGetMany`, `userCreate`, `UserCreateDto` — never `getUsers`/`CreateUserDto`.
+- List endpoints accept `page/pageSize/sortBy/sortOrder/search` and return the envelope `{ items, totalCount }` (pageSize capped at 100).
+- Logging via nestjs-pino; Swagger is enabled in non-prod at `/api/docs` (describes the full domain flow — read it for orientation).
 
-## 8. Golden rules for changes
+## Frontend architecture
 
-1. **Declarative over code**: new routing/assignment behavior belongs in `resolveAssignment` strategies or assignment config — never in user-written triggers.
-2. **Immutability**: never rewrite `ProcessVersion` rows; restore = append a new version. Never mutate `ProcessInstance.bpmnXmlSnapshot`.
-3. **Engine safety**: never persist condition XML that the validator would reject; keep the three validation layers in sync.
-4. **taskName matching**: `TaskAssignment.taskName` must equal the BPMN `userTask` `name` attribute exactly (Persian names are fine, but must match byte-for-byte).
-5. **Schema changes**: edit `prisma/schema.prisma` → `npx prisma migrate dev --name <change>` (client regenerates) → update `prisma/seed.ts` → re-seed → re-run E2E.
-6. Append your session to `worklog.md` using the template at the top of that file.
+- Path alias `@/*` → `src/*`.
+- All API calls go through `src/lib/api.ts` (same-origin `/api` — Next rewrites proxy to `localhost:3001`, so CORS never comes up). The api client **unwraps** the `{items,totalCount}` envelope and auto-paginates, so list helpers resolve to plain `T[]`.
+- Views live in `src/components/views/*-view.tsx`; thin route pages under `src/app/(app)/{admin,dashboard,instances,processes,tasks}`.
+- UI text is **Persian (RTL)** — strings come from the `t` object in `src/lib/i18n.ts`; add new UI strings there, in Persian.
+- BPMN modeling uses `bpmn-js` (frontend) ↔ `bpmn-engine` (backend); process definitions are BPMN 2.0 XML uploaded by admins, userTasks are bound by element name to users/forms.
+
+## Gotchas
+
+- `next.config.ts` sets `skipTrailingSlashRedirect: true` deliberately — removing it causes an infinite `/dashboard` redirect loop behind the proxy.
+- `**/generated/prisma` and `*.db` are gitignored: fresh clone needs `prisma:generate` (+ `prisma:migrate` or copy `db/bpms.db`).
+- Frontend `start`/`build` scripts use Unix `cp`/`tee` — they fail on Windows cmd; use Git Bash, WSL, or Docker.
+- `frontend/tsconfig.json` `exclude` list intentionally ignores several dirs; don't "fix" it.
+- Env config: `backend/.env` (see `.env.example`) — `DATABASE_URL=file:./db/bpms.db`, `JWT_SECRET` must be ≥32 chars (Joi-validated).

@@ -205,36 +205,23 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     [categories],
   );
 
-  const formFieldVariables = forms.flatMap((f) =>
-    (f.fields || []).map((field: FormField) => ({
-      name: field.variable || field.name,
-      type: field.type,
-      formName: f.name,
-      label: field.label,
-      options: resolveFieldOptions(field),
-    })),
+  // Single source of truth: the process-variables registry. Saving a form
+  // auto-registers every field's variable here (ensureProcessVariables in
+  // FormBuilderPanel), so the registry always covers form-backed variables —
+  // enriched with each field's selectable options for the condition builder.
+  const conditionVariables: ConditionVariable[] = forms.flatMap((f) =>
+    (f.fields || []).map((field: FormField) => {
+      const declared = processVariables.find(
+        (v) => v.name === (field.variable || field.name),
+      );
+      return {
+        name: field.variable || field.name,
+        label: declared?.label || field.label,
+        type: declared?.type || field.type,
+        options: resolveFieldOptions(field),
+      };
+    }),
   );
-
-  // Merged, de-duplicated variables available to gateway conditions.
-  // A declared process variable wins on label/type, but it is ENRICHED with
-  // the selectable options of a same-named form field — so the no-code
-  // condition builder offers the same dropdown values the runtime form shows
-  // (category-backed when the field references one).
-  const conditionVariables: ConditionVariable[] = (() => {
-    const map = new Map<string, ConditionVariable>();
-    processVariables.forEach((v) => map.set(v.name, { name: v.name, label: v.label, type: v.type }));
-    formFieldVariables.forEach((v) => {
-      const declared = map.get(v.name);
-      if (declared) {
-        if (v.options?.length && !(declared.options?.length)) {
-          declared.options = v.options;
-        }
-        return;
-      }
-      map.set(v.name, { name: v.name, label: v.label, type: v.type, options: v.options });
-    });
-    return [...map.values()];
-  })();
 
   const handleXmlChange = useCallback((xml: string) => {
     setBpmnXml(xml);
@@ -547,7 +534,6 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             {activeTab === 'variables' && (
               <VariablesTab
                 processVariables={processVariables}
-                formFieldVariables={formFieldVariables}
                 onSave={saveProcessVariables}
               />
             )}
@@ -560,9 +546,6 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           form={editingForm}
           processId={currentProcessId}
           processVariables={processVariables}
-          existingVariables={formFieldVariables.filter(
-            (v) => !editingForm || v.formName !== editingForm.name,
-          )}
           onProcessVariablesChange={setProcessVariables}
           onClose={() => setShowFormBuilder(false)}
           onSaved={async () => {
@@ -702,11 +685,9 @@ function FormsTab({
 
 function VariablesTab({
   processVariables,
-  formFieldVariables,
   onSave,
 }: {
   processVariables: ProcessVariable[];
-  formFieldVariables: { name: string; type: string; formName: string; label: string }[];
   onSave: (vars: ProcessVariable[]) => void;
 }) {
   const [vars, setVars] = useState(processVariables);
@@ -748,7 +729,7 @@ function VariablesTab({
   return (
     <div className="space-y-4">
       <div className="p-3 bg-card rounded-xl border border-border/60 space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">افزودن متغیر فرآیند</p>
+        <p className="text-xs font-medium text-muted-foreground">افزودن متغیر</p>
         <Input
           value={newName}
           onChange={(e) => setNewName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
@@ -780,76 +761,51 @@ function VariablesTab({
         </Button>
       </div>
 
-      {vars.length === 0 && formFieldVariables.length === 0 ? (
+      {vars.length === 0 ? (
         <div className="text-center text-muted-foreground/80 py-4">
           <Variable className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p className="text-xs">هنوز متغیری تعریف نشده</p>
         </div>
       ) : (
-        <>
-          {vars.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">متغیرهای فرآیند</p>
-              {vars.map((v) => (
-                <div key={v.name} className="p-2.5 bg-card rounded-xl border border-border/60 flex items-center justify-between">
-                  <div>
-                    <code className="text-xs font-mono text-foreground" dir="ltr">
-                      {v.name}
-                    </code>
-                    <p className="text-xs text-muted-foreground">{v.label}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-muted text-muted-foreground'}`}>
-                      {v.type}
-                    </Badge>
-                    <button
-                      onClick={() => removeVariable(v.name)}
-                      className="p-1 hover:bg-destructive/10 text-destructive rounded"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            متغیرهای فرآیند — قابل اتصال به فیلدهای فرم‌ها و استفاده در شرط دروازه
+          </p>
+          {vars.map((v) => (
+            <div key={v.name} className="p-2.5 bg-card rounded-xl border border-border/60 flex items-center justify-between">
+              <div>
+                <code className="text-xs font-mono text-foreground" dir="ltr">
+                  {v.name}
+                </code>
+                <p className="text-xs text-muted-foreground">{v.label}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-muted text-muted-foreground'}`}>
+                  {v.type}
+                </Badge>
+                <button
+                  onClick={() => removeVariable(v.name)}
+                  className="p-1 hover:bg-destructive/10 text-destructive rounded"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
-          )}
-
-          {formFieldVariables.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">متغیرهای فرم‌ها</p>
-              {formFieldVariables.map((v, i) => (
-                <div key={i} className="p-2.5 bg-card rounded-xl border border-border/60">
-                  <div className="flex items-center justify-between">
-                    <code className="text-xs font-mono text-foreground" dir="ltr">
-                      {v.name}
-                    </code>
-                    <Badge className={`text-[10px] ${typeColors[v.type] || 'bg-muted text-muted-foreground'}`}>
-                      {v.type}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {v.label} — {v.formName}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {(vars.length > 0 || formFieldVariables.length > 0) && (
-            <div className="p-3 bg-primary/8 dark:bg-primary/12 rounded-xl text-xs text-primary">
-              <p className="font-medium mb-1">استفاده در شرط دروازه:</p>
-              <p className="leading-5">
-                روی دروازه انحصاری راست‌کلیک کنید و «مدیریت شرط‌ها» را انتخاب کنید؛ شرط‌ها به
-                صورت <span dir="ltr" className="font-mono">next(null, …)</span> روی فلش‌های خروجی ذخیره
-                می‌شوند. نمونه عبارت:
-              </p>
-              <code dir="ltr" className="text-[11px] block bg-card p-2 rounded-lg mt-1.5 font-mono">
-                environment.variables.{vars[0]?.name || formFieldVariables[0]?.name} === 'value'
-              </code>
-            </div>
-          )}
-        </>
+          ))}
+        </div>
       )}
+
+      <div className="p-3 bg-primary/8 dark:bg-primary/12 rounded-xl text-xs text-primary">
+        <p className="font-medium mb-1">استفاده در شرط دروازه:</p>
+        <p className="leading-5">
+          روی دروازه انحصاری راست‌کلیک کنید و «مدیریت شرط‌ها» را انتخاب کنید؛ شرط‌ها به
+          صورت <span dir="ltr" className="font-mono">next(null, …)</span> روی فلش‌های خروجی ذخیره
+          می‌شوند. نمونه عبارت:
+        </p>
+        <code dir="ltr" className="text-[11px] block bg-card p-2 rounded-lg mt-1.5 font-mono">
+          environment.variables.{vars[0]?.name} === 'value'
+        </code>
+      </div>
     </div>
   );
 }

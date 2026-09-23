@@ -6,6 +6,7 @@ import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
 import './bpmn-designer.css';
 import { taskLabelFixModule } from './task-label-fix';
+import { defaultUserTaskModule } from './default-user-task-fix';
 
 export interface BpmnDesignerHandle {
   deleteSelected: () => void;
@@ -89,7 +90,7 @@ export function BpmnDesigner({
         container: containerRef.current,
         // NOTE: diagram-js >= 8 removed `keyboard.bindTo` — binding to the
         // document is now implicit. See https://github.com/bpmn-io/diagram-js/issues/661
-        additionalModules: [taskLabelFixModule],
+        additionalModules: [taskLabelFixModule, defaultUserTaskModule],
       });
       modelerRef.current = modeler;
 

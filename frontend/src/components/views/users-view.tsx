@@ -83,7 +83,7 @@ export function UsersView() {
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (search) {
         const q = search.trim();
-        if (q && !`${u.name} ${u.email}`.includes(q)) return false;
+        if (q && !`${u.name} ${u.username} ${u.email}`.includes(q)) return false;
       }
       return true;
     });
@@ -96,6 +96,17 @@ export function UsersView() {
       flex: 1.2,
       minWidth: 160,
       renderCell: (p) => <span className="truncate font-semibold">{p.value as string}</span>,
+    },
+    {
+      field: 'username',
+      headerName: t.username,
+      flex: 1,
+      minWidth: 120,
+      renderCell: (p) => (
+        <span className="truncate text-muted-foreground" dir="ltr">
+          {p.value as string}
+        </span>
+      ),
     },
     {
       field: 'email',
@@ -245,6 +256,7 @@ export function UsersView() {
 
 function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(user?.name || '');
+  const [username, setUsername] = useState(user?.username || '');
   const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(user?.role || 'USER');
@@ -252,14 +264,14 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
   const { toast } = useToast();
 
   const handleSave = async () => {
-    if (!name || !email) {
-      toast({ title: 'خطا', description: 'نام و ایمیل الزامی است', variant: 'destructive' });
+    if (!name || !username || !email) {
+      toast({ title: 'خطا', description: 'نام، نام کاربری و ایمیل الزامی است', variant: 'destructive' });
       return;
     }
     setSaving(true);
     try {
       if (user) {
-        const data: any = { name, email, role };
+        const data: any = { name, username, email, role };
         if (password) data.password = password;
         await usersApi.update(user.id, data);
       } else {
@@ -268,7 +280,7 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
           setSaving(false);
           return;
         }
-        await usersApi.create({ name, email, password, role });
+        await usersApi.create({ name, username, email, password, role });
       }
       toast({ title: 'موفقیت', description: 'کاربر ذخیره شد' });
       onSaved();
@@ -294,6 +306,16 @@ function UserDialog({ user, onClose, onSaved }: { user: any | null; onClose: () 
           <div className="space-y-2">
             <Label className="font-medium">نام *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-medium">{t.username} *</Label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              dir="ltr"
+              className="text-left"
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-2">
             <Label className="font-medium">ایمیل *</Label>

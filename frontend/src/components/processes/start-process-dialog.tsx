@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { processesApi, processInstancesApi, tasksApi } from '@/lib/api';
+import { processesApi, processDraftsApi, tasksApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -25,14 +25,8 @@ interface Props {
 }
 
 /**
- * Global "start a process" dialog — reachable from the top bar for every
- * user and from the process report page (deep-link seam ?start=...).
- *
- * On success the user is taken straight to the process form: the backend
- * has already created the first task (waitForFirstTask), so if any active
- * step of the new instance is visible to the current user (assignee or
- * unclaimed position pool), its task form opens immediately; otherwise the
- * user lands on the instance detail page.
+ * After a draft is submitted (or a legacy start), navigate to the first
+ * PENDING task of the new instance if visible to the user; else the case page.
  */
 export async function navigateToInstanceEntry(
   router: ReturnType<typeof useRouter>,
@@ -51,9 +45,16 @@ export async function navigateToInstanceEntry(
     router.push(`/tasks/${firstActive.id}`);
     return;
   }
-  router.push(`/instances/${inst?.id}`);
+  router.push(`/cases/${inst?.id}`);
 }
 
+/**
+ * Global "start a process" dialog — reachable from the top bar for every
+ * user and from the process report page (deep-link seam ?start=...).
+ *
+ * Selecting a process creates a DRAFT (does not start the BPMN engine) and
+ * opens the draft form. The real instance starts only when the user submits.
+ */
 export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Props) {
   const [processes, setProcesses] = useState<any[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<string>('');
@@ -99,10 +100,10 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
     if (!selectedProcess) return;
     setStarting(true);
     try {
-      const inst = await processInstancesApi.start(selectedProcess);
-      toast({ title: 'موفقیت', description: 'نمونه فرآیند شروع شد' });
+      const draft = await processDraftsApi.create(selectedProcess);
+      toast({ title: 'موفقیت', description: 'پیش‌نویس ایجاد شد — فرم را تکمیل کنید' });
       onOpenChange(false);
-      await navigateToInstanceEntry(router, inst);
+      router.push(`/drafts/${draft.id}`);
     } catch (err: any) {
       toast({ title: 'خطا', description: err.message, variant: 'destructive' });
     } finally {

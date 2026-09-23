@@ -12,25 +12,25 @@ import { Loader2, LayoutDashboard, ShieldCheck, UserRound } from 'lucide-react';
 
 /** Demo accounts for one-click quick login (UI redesign Phase 7). */
 const demoAccounts = [
-  { label: 'مدیر', email: 'admin@bpms.local', password: 'admin123', isAdmin: true },
-  { label: 'جان', email: 'john@bpms.local', password: 'user123', isAdmin: false },
-  { label: 'جین', email: 'jane@bpms.local', password: 'user123', isAdmin: false },
-  { label: 'باب', email: 'bob@bpms.local', password: 'user123', isAdmin: false },
+  { label: 'مدیر', username: 'admin', password: 'admin123', isAdmin: true },
+  { label: 'جان', username: 'john', password: 'user123', isAdmin: false },
+  { label: 'جین', username: 'jane', password: 'user123', isAdmin: false },
+  { label: 'باب', username: 'bob', password: 'user123', isAdmin: false },
 ];
 
 export function LoginView() {
   const { login } = useAuth();
   const { toast } = useToast();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const doLogin = async (emailValue: string, passwordValue: string) => {
+  const doLogin = async (usernameValue: string, passwordValue: string) => {
     setLoading(true);
     try {
-      await login(emailValue, passwordValue);
+      await login(usernameValue, passwordValue);
       toast({ title: 'خوش آمدید', description: 'ورود موفقیت‌آمیز بود' });
-    } catch (err: any) {
+    } catch {
       toast({
         title: 'خطا',
         description: t.loginError,
@@ -43,13 +43,13 @@ export function LoginView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await doLogin(email, password);
+    await doLogin(username, password);
   };
 
   const handleQuickLogin = async (account: (typeof demoAccounts)[number]) => {
-    setEmail(account.email);
+    setUsername(account.username);
     setPassword(account.password);
-    await doLogin(account.email, account.password);
+    await doLogin(account.username, account.password);
   };
 
   return (
@@ -77,13 +77,14 @@ export function LoginView() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">{t.email}</Label>
+              <Label htmlFor="username">{t.username}</Label>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@bpms.local"
+                id="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="admin"
                 required
                 dir="ltr"
                 className="border-input/60 bg-muted/50 text-left focus-visible:bg-card"
@@ -94,6 +95,7 @@ export function LoginView() {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -116,7 +118,7 @@ export function LoginView() {
             <div className="grid grid-cols-2 gap-2">
               {demoAccounts.map((account) => (
                 <button
-                  key={account.email}
+                  key={account.username}
                   type="button"
                   disabled={loading}
                   onClick={() => handleQuickLogin(account)}
@@ -140,7 +142,7 @@ export function LoginView() {
                       {account.label}
                     </span>
                     <span className="block text-[10px] leading-3 text-muted-foreground" dir="ltr">
-                      {account.email.split('@')[0]}
+                      {account.username}
                     </span>
                   </span>
                 </button>

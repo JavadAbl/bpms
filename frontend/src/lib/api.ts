@@ -1,7 +1,19 @@
 /**
- * API client for BPMS backend.
+ * API client for the BPMS backend (template-architecture conversion).
  * Uses Next.js rewrites to proxy /api/* to the NestJS backend on port 3001.
  * This avoids CORS issues — all calls are same-origin.
+ *
+ * Backend API shape (synced 2026-09):
+ * - List endpoints (GET collections) return the envelope `{ items, totalCount }`
+ *   and accept `page` / `pageSize` / `sortBy` / `sortOrder` / `search` query
+ *   params (pageSize is capped at 100 by the backend).
+ * - user/form/category/department/position `create` returns the created id
+ *   (a bare JSON string); their `update` returns void (200 with empty body).
+ * - processes/reports create+update return the full entity; deletes return 204.
+ *
+ * To keep the view layer simple, the list helpers below UNWRAP the envelope and
+ * auto-paginate (fetching every page up to a safety cap), so every list method
+ * still resolves to a plain `T[]` — the same contract the views were built on.
  */
 
 const API_BASE = '/api';
@@ -44,7 +56,7 @@ async function apiFetch<T = any>(path: string, options: FetchOptions = {}): Prom
 
   const finalHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...headers,
+    ...(headers as Record<string, string> | undefined),
   };
 
   const t = getToken();
@@ -64,21 +76,86 @@ async function apiFetch<T = any>(path: string, options: FetchOptions = {}): Prom
     throw err;
   }
 
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  // Backend "void" endpoints (e.g. update) answer 200 with an EMPTY body —
+  // res.json() would throw on those, so parse defensively via text.
+  const text = await res.text();
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as T;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GetMany envelope — backend list contract
+// ---------------------------------------------------------------------------
+
+/** Envelope returned by every backend list endpoint. */
+export interface GetManyReply<T> {
+  items: T[];
+  totalCount: number;
+}
+
+/** Backend caps `pageSize` at 100 — request full pages. */
+const PAGE_SIZE = 100;
+/** Hard safety cap: 20 pages = 2,000 rows per list call. */
+const MAX_PAGES = 20;
+
+/** Extra query params accepted by backend list endpoints. */
+export interface GetManyParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  search?: string;
+}
+
+/**
+ * GET a list endpoint and UNWRAP the `{ items, totalCount }` envelope,
+ * fetching every page until `totalCount` rows are collected (or the safety
+ * cap is hit). Resolves to a plain array — the old unpaginated contract.
+ */
+async function fetchAll<T>(
+  path: string,
+  params: Record<string, string | number | boolean | undefined> = {},
+): Promise<T[]> {
+  const merged = (page: number): Record<string, string | number | boolean | undefined> => ({
+    ...params,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const first = await apiFetch<GetManyReply<T>>(path, { params: merged(1) });
+  const items = [...(first.items ?? [])];
+  const total = Math.min(first.totalCount ?? items.length, PAGE_SIZE * MAX_PAGES);
+  while (items.length < total) {
+    const next = await apiFetch<GetManyReply<T>>(path, {
+      params: merged(Math.floor(items.length / PAGE_SIZE) + 1),
+    });
+    if (!next.items?.length) break; // server-side drift — stop paging
+    items.push(...next.items);
+  }
+  return items;
 }
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 export const authApi = {
-  login: (email: string, password: string) =>
-    apiFetch<{ accessToken: string; userId: string; email: string; name: string; role: string }>(
-      '/auth/login',
-      { method: 'POST', body: JSON.stringify({ email, password }) },
-    ),
-  register: (email: string, name: string, password: string) =>
-    apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ email, name, password }) }),
+  login: (username: string, password: string) =>
+    apiFetch<{
+      accessToken: string;
+      userId: string;
+      username: string;
+      email: string;
+      name: string;
+      role: string;
+    }>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  register: (username: string, email: string, name: string, password: string) =>
+    apiFetch('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, name, password }),
+    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -99,12 +176,13 @@ export const dashboardApi = {
 };
 
 // ---------------------------------------------------------------------------
-// Tasks
+// Tasks — list endpoints (mine / participated / all) return the GetMany
+// envelope; unwrapped here into a plain Task[].
 // ---------------------------------------------------------------------------
 export const tasksApi = {
-  mine: () => apiFetch<any[]>('/tasks/mine'),
-  participated: () => apiFetch<any[]>('/tasks/participated'),
-  findAll: () => apiFetch<any[]>('/tasks'),
+  mine: () => fetchAll<any>('/tasks/mine'),
+  participated: () => fetchAll<any>('/tasks/participated'),
+  findAll: () => fetchAll<any>('/tasks'),
   findOne: (id: string) => apiFetch<any>(`/tasks/${id}`),
   complete: (id: string, data: Record<string, any>) =>
     apiFetch(`/tasks/${id}/complete`, { method: 'POST', body: JSON.stringify({ data }) }),
@@ -113,11 +191,14 @@ export const tasksApi = {
 };
 
 // ---------------------------------------------------------------------------
-// Process Instances
+// Process Instances — GET list endpoints return the GetMany envelope
+// (unwrapped); start/terminate/findOne return the full instance object.
 // ---------------------------------------------------------------------------
 export const processInstancesApi = {
-  findAll: () => apiFetch<any[]>('/process-instances'),
-  mine: () => apiFetch<any[]>('/process-instances/mine'),
+  findAll: () => fetchAll<any>('/process-instances'),
+  mine: () => fetchAll<any>('/process-instances/mine'),
+  /** Case list: user participates (started or has a task) — admin gets all */
+  cases: () => fetchAll<any>('/process-instances/cases'),
   findOne: (id: string) => apiFetch<any>(`/process-instances/${id}`),
   start: (processId: string) =>
     apiFetch('/process-instances', { method: 'POST', body: JSON.stringify({ processId }) }),
@@ -125,10 +206,35 @@ export const processInstancesApi = {
 };
 
 // ---------------------------------------------------------------------------
-// Process Definitions
+// Process drafts — pre-start form fill. Submit starts the BPMN instance and
+// completes the first user task with the saved form data.
+// ---------------------------------------------------------------------------
+export const processDraftsApi = {
+  findAll: () => fetchAll<any>('/process-drafts'),
+  findOne: (id: string) => apiFetch<any>(`/process-drafts/${id}`),
+  create: (processId: string) =>
+    apiFetch('/process-drafts', { method: 'POST', body: JSON.stringify({ processId }) }),
+  update: (id: string, data: Record<string, any>) =>
+    apiFetch(`/process-drafts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data }),
+    }),
+  submit: (id: string, data?: Record<string, any>) =>
+    apiFetch(`/process-drafts/${id}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ data: data || {} }),
+    }),
+  remove: (id: string) =>
+    apiFetch(`/process-drafts/${id}`, { method: 'DELETE' }),
+};
+
+// ---------------------------------------------------------------------------
+// Process Definitions — GET /processes returns the GetMany envelope
+// (unwrapped, auto-paginated); all sub-resources and writes keep their
+// original shapes (plain arrays / full DTOs / 204 on delete).
 // ---------------------------------------------------------------------------
 export const processesApi = {
-  findAll: () => apiFetch<any[]>('/processes'),
+  findAll: () => fetchAll<any>('/processes'),
   findOne: (id: string) => apiFetch<any>(`/processes/${id}`),
   getUserTasks: (id: string) => apiFetch<any[]>(`/processes/${id}/user-tasks`),
   getAssignments: (id: string) => apiFetch<any[]>(`/processes/${id}/assignments`),
@@ -171,17 +277,17 @@ export const processesApi = {
 };
 
 // ---------------------------------------------------------------------------
-// Forms
+// Forms — scoped to a process (processId is REQUIRED on the list endpoint).
+// create returns the new form id (string); update returns void.
 // ---------------------------------------------------------------------------
 export const formsApi = {
-  findAll: (processId: string) =>
-    apiFetch<any[]>('/forms', { params: { processId } }),
+  findAll: (processId: string) => fetchAll<any>('/forms', { processId }),
   findOne: (id: string) => apiFetch<any>(`/forms/${id}`),
   create: (data: { name: string; description?: string; fields: any[]; processId: string }) =>
-    apiFetch('/forms', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch<string>('/forms', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: { name: string; description?: string; fields: any[]; processId: string }) =>
-    apiFetch(`/forms/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  remove: (id: string) => apiFetch(`/forms/${id}`, { method: 'DELETE' }),
+    apiFetch<void>(`/forms/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) => apiFetch<void>(`/forms/${id}`, { method: 'DELETE' }),
 };
 
 // ---------------------------------------------------------------------------
@@ -214,41 +320,47 @@ export interface CategoryItemInput {
 }
 
 export const categoriesApi = {
-  findAll: () => apiFetch<Category[]>('/categories'),
+  /** List endpoints return the GetMany envelope — unwrapped to Category[]. */
+  findAll: () => fetchAll<Category>('/categories'),
   findOne: (id: string) => apiFetch<Category>(`/categories/${id}`),
+  /** Returns the created category id (string), not the entity. */
   create: (data: { key: string; name: string; description?: string; items?: CategoryItemInput[] }) =>
-    apiFetch<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch<string>('/categories', { method: 'POST', body: JSON.stringify(data) }),
+  /** Returns void (200, empty body). */
   update: (
     id: string,
     data: { key?: string; name?: string; description?: string; items?: CategoryItemInput[] },
-  ) => apiFetch<Category>(`/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  remove: (id: string) => apiFetch(`/categories/${id}`, { method: 'DELETE' }),
+  ) => apiFetch<void>(`/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) => apiFetch<void>(`/categories/${id}`, { method: 'DELETE' }),
 };
 
 // ---------------------------------------------------------------------------
-// Departments
+// Departments — list returns the GetMany envelope (unwrapped);
+// create returns the id, update returns void.
 // ---------------------------------------------------------------------------
 export const departmentsApi = {
-  findAll: () => apiFetch<any[]>('/departments'),
+  findAll: () => fetchAll<any>('/departments'),
   findOne: (id: string) => apiFetch<any>(`/departments/${id}`),
   create: (data: { name: string; description?: string }) =>
-    apiFetch('/departments', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch<string>('/departments', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: { name?: string; description?: string }) =>
-    apiFetch(`/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  remove: (id: string) => apiFetch(`/departments/${id}`, { method: 'DELETE' }),
+    apiFetch<void>(`/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) => apiFetch<void>(`/departments/${id}`, { method: 'DELETE' }),
 };
 
 // ---------------------------------------------------------------------------
-// Positions
+// Positions — GET /positions returns the GetMany envelope (unwrapped);
+// by-department lists stay plain arrays; create returns the id, update void;
+// assignUsers / removeUser still return the updated Position.
 // ---------------------------------------------------------------------------
 export const positionsApi = {
-  findAll: () => apiFetch<any[]>('/positions'),
+  findAll: () => fetchAll<any>('/positions'),
   findByDepartment: (deptId: string) => apiFetch<any[]>(`/positions/by-department/${deptId}`),
   findOne: (id: string) => apiFetch<any>(`/positions/${id}`),
   create: (deptId: string, data: { name: string; description?: string }) =>
-    apiFetch(`/positions/by-department/${deptId}`, { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch<string>(`/positions/by-department/${deptId}`, { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: { name?: string; description?: string }) =>
-    apiFetch(`/positions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    apiFetch<void>(`/positions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) => apiFetch(`/positions/${id}`, { method: 'DELETE' }),
   assignUsers: (id: string, userIds: string[]) =>
     apiFetch(`/positions/${id}/users`, { method: 'POST', body: JSON.stringify({ userIds }) }),
@@ -257,16 +369,17 @@ export const positionsApi = {
 };
 
 // ---------------------------------------------------------------------------
-// Users
+// Users — list returns the GetMany envelope (unwrapped);
+// create returns the id (string), update returns void.
 // ---------------------------------------------------------------------------
 export const usersApi = {
-  findAll: () => apiFetch<any[]>('/users'),
+  findAll: () => fetchAll<any>('/users'),
   findOne: (id: string) => apiFetch<any>(`/users/${id}`),
-  create: (data: { email: string; name: string; password: string; role?: string }) =>
-    apiFetch('/users', { method: 'POST', body: JSON.stringify(data) }),
+  create: (data: { username: string; email: string; name: string; password: string; role?: string }) =>
+    apiFetch<string>('/users', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Record<string, any>) =>
-    apiFetch(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  remove: (id: string) => apiFetch(`/users/${id}`, { method: 'DELETE' }),
+    apiFetch<void>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) => apiFetch<void>(`/users/${id}`, { method: 'DELETE' }),
 };
 
 // ---------------------------------------------------------------------------
@@ -352,7 +465,8 @@ export interface SaveReportInput {
 }
 
 export const reportsApi = {
-  findAll: () => apiFetch<ReportDefinition[]>('/reports'),
+  /** GET /reports returns the GetMany envelope — unwrapped to ReportDefinition[]. */
+  findAll: () => fetchAll<ReportDefinition>('/reports'),
   findOne: (id: string) => apiFetch<ReportDefinition>(`/reports/${id}`),
   create: (data: SaveReportInput) =>
     apiFetch<ReportDefinition>('/reports', { method: 'POST', body: JSON.stringify(data) }),

@@ -12,7 +12,7 @@ export default function DashboardPage() {
   return (
     <DashboardView
       onViewTask={(id) => router.push(`/tasks/${id}`)}
-      onViewInstance={(id) => router.push(`/instances/${id}`)}
+      onViewInstance={(id) => router.push(`/cases/${id}`)}
     />
   );
 }

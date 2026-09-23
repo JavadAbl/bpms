@@ -1,0 +1,71 @@
+---
+description: Module patterns — repository, controller, service, GetMany helpers, naming, contracts
+globs: src/modules/**/*.ts
+alwaysApply: false
+---
+
+# Domain modules
+
+Mirror `src/modules/user/` for new domains.
+
+## Naming (domain + verb)
+
+Methods and DTOs use **domain + verb** (not verb-first):
+
+```typescript
+// ✅ GOOD
+userGetMany / userGetById / userCreate / userUpdate / userDelete
+UserCreateDto / UserUpdateDto / UserDto
+
+// ❌ BAD
+getManyUsers / createUser / CreateUserDto
+```
+
+## Repository
+
+- Domain repo extends `Repository<'model'>` from `#common/infrastructure/database/base.repository`.
+- Prefer generic methods: `findMany`, `findUnique`, `findAndCheckExistsBy`, `checkDuplicateBy`, `create`, `update`, `remove`, etc.
+- If the base repo cannot express a need, add a **custom method on the domain repository** (not on the service via raw Prisma).
+
+## List endpoints (GetMany)
+
+Controller → service → repo:
+
+```typescript
+// controller
+userGetMany(@Query() query: GetManyQuery): Promise<GetManyReply<UserDto>> {
+  return this.userService.userGetMany(query as GetManyQueryType<'User'>);
+}
+
+// service
+const predicate = buildFindManyArgs(query, { searchableFields: ['name'] });
+const { items, totalCount } = await this.userRep.findMany(predicate);
+return { items, totalCount };
+```
+
+Use `GetManyQuery` / `GetManyQueryType`, `GetManyReply`, `ApiGetManyResponse`, and `buildFindManyArgs`.
+
+## Controller + Swagger
+
+- Annotate with `@ApiTags`, `@ApiOperation`, and response decorators (`@ApiOkResponse`, `@ApiCreatedResponse`, `@ApiGetManyResponse`, etc.).
+- Controllers call the domain **service**; they do not talk to repositories.
+
+## Cross-module exports (contracts)
+
+Do **not** export the concrete service for other modules. Export a contract and bind a provider:
+
+```typescript
+// contracts/user-service.contract.ts
+export abstract class UserServiceContract {
+  abstract userGetById(id: number): Promise<User | null>;
+}
+
+// providers/user.service.provider.ts
+export class UserProvider implements UserServiceContract { /* ... */ }
+
+// user.module.ts
+providers: [..., { provide: UserServiceContract, useClass: UserProvider }],
+exports: [UserServiceContract],
+```
+
+Other modules import the module and inject `UserServiceContract`.

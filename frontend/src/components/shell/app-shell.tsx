@@ -37,7 +37,6 @@ import { StartProcessDialog } from '@/components/processes/start-process-dialog'
 import {
   ClipboardList,
   GitBranch,
-  History,
   Workflow,
   Building2,
   Users,
@@ -50,6 +49,7 @@ import {
   PanelRight,
   PanelRightClose,
   Play,
+  FileEdit,
 } from 'lucide-react';
 
 /**
@@ -65,8 +65,8 @@ function useNavItems(isAdmin: boolean) {
   return [
     { href: '/dashboard', label: t.dashboard, icon: LayoutDashboard, show: true },
     { href: '/tasks', label: t.myTasks, icon: ClipboardList, show: true },
-    { href: '/tasks/participated', label: t.participatedTasks, icon: History, show: true },
-    { href: '/instances', label: t.instances, icon: GitBranch, show: isAdmin },
+    { href: '/drafts', label: t.drafts, icon: FileEdit, show: true },
+    { href: '/cases', label: t.myCases, icon: GitBranch, show: true },
     { href: '/processes', label: t.processes, icon: Workflow, show: isAdmin },
     { href: '/admin/departments', label: t.departments, icon: Building2, show: isAdmin },
     { href: '/admin/categories', label: t.categories, icon: Tags, show: isAdmin },
@@ -77,14 +77,7 @@ function useNavItems(isAdmin: boolean) {
 
 function isActiveHref(pathname: string, href: string) {
   if (href === '/dashboard') return pathname === '/dashboard';
-  // '/tasks/participated' is a SIBLING page, not a child of the کارتابل inbox —
-  // keep the inbox item un-highlighted there (it still lights up on /tasks/:id detail).
-  if (href === '/tasks') {
-    return (
-      pathname === '/tasks' ||
-      (pathname.startsWith('/tasks/') && !pathname.startsWith('/tasks/participated'))
-    );
-  }
+  // Task detail is a child of the کارتابل inbox — the inbox item lights up there.
   return pathname === href || pathname.startsWith(href + '/');
 }
 
@@ -312,8 +305,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="flex flex-col">
                   <span className="text-sm font-medium">{user?.name}</span>
-                  <span className="text-xs text-muted-foreground font-normal truncate">
-                    {user?.email}
+                  <span className="text-xs text-muted-foreground font-normal truncate" dir="ltr">
+                    {user?.username || user?.email}
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
