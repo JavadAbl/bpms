@@ -1,11 +1,12 @@
 /**
- * Core fetch client for the BPMS backend.
+ * Core HTTP client for the BPMS backend (axios).
  *
  * All calls go through the same-origin `/api` prefix (Next.js rewrites proxy
  * to the NestJS backend on :3001, so CORS never comes up). Token handling and
- * error normalization live here; domain modules under src/lib/api/ build on
- * top of this and everything is re-exported from ./index.
+ * error normalization live in the shared axios instance interceptors; domain
+ * modules under src/lib/api/ and the per-slice api.ts files build on top of it.
  */
+import axios, { AxiosError, type AxiosInstance } from 'axios';
 
 export const API_BASE = '/api';
 
@@ -29,61 +30,102 @@ export function getToken(): string | null {
   return token;
 }
 
-export interface FetchOptions extends RequestInit {
-  params?: Record<string, string | number | boolean | undefined>;
-}
-
-export async function apiFetch<T = any>(path: string, options: FetchOptions = {}): Promise<T> {
-  const { params, headers, ...rest } = options;
-
-  const url = new URL(`${API_BASE}${path}`, window.location.origin);
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null) {
-        url.searchParams.set(key, String(value));
+/**
+ * Shared axios instance — every request in the app goes through it, so the
+ * auth header, 401 handling and error shape are applied in exactly one place.
+ */
+export const http: AxiosInstance = axios.create({
+  baseURL: API_BASE,
+  // Backend "void" endpoints (e.g. update) answer 200 with an EMPTY body and
+  // some answers are plain text — the default JSON-only transform would throw
+  // on both. Parse defensively, mirroring the old fetch client.
+  transformResponse: [
+    (data: unknown) => {
+      if (typeof data !== 'string') return data; // Blob / ArrayBuffer / …
+      if (data === '') return undefined; // empty body → "void"
+      try {
+        return JSON.parse(data);
+      } catch {
+        return undefined; // non-JSON body → don't explode
       }
-    }
-  }
+    },
+  ],
+});
 
-  const finalHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(headers as Record<string, string> | undefined),
-  };
-
+// Attach the JWT (if any) to every request.
+http.interceptors.request.use((config) => {
   const t = getToken();
   if (t) {
-    finalHeaders['Authorization'] = `Bearer ${t}`;
+    config.headers.set('Authorization', `Bearer ${t}`);
   }
+  return config;
+});
 
-  const res = await fetch(url.toString(), {
-    ...rest,
-    headers: finalHeaders,
-  });
+// Normalize errors + handle session expiry.
+http.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError<{ message?: string; error?: string }>) => {
+    const status = error.response?.status;
+    const url = error.config?.url ?? '';
 
-  if (!res.ok) {
     // Expired / revoked token on a non-auth endpoint: drop the token and
     // hard-navigate to /login. The full reload re-runs AuthProvider, so no
     // stale user context survives. Login/register endpoints are excluded —
     // a failed login is a normal 401, not a session expiry.
-    if (res.status === 401 && !path.startsWith('/auth/')) {
+    if (status === 401 && !url.startsWith('/auth/')) {
       setToken(null);
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
     }
-    const errorBody = await res.json().catch(() => ({ message: res.statusText }));
-    const err = new Error(errorBody.message || `HTTP ${res.status}`);
-    (err as any).status = res.status; // let callers branch on 403/404/…
-    throw err;
-  }
 
-  // Backend "void" endpoints (e.g. update) answer 200 with an EMPTY body —
-  // res.json() would throw on those, so parse defensively via text.
-  const text = await res.text();
-  if (!text) return undefined as T;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return undefined as T;
-  }
+    // Plain Error with `.status`, message from the backend envelope when
+    // present — the contract domain modules branch on (403/404/…).
+    const body = error.response?.data;
+    const err = new Error(
+      body && typeof body === 'object' ? body.message || body.error || '' : '',
+    ) as Error & { status?: number };
+    err.message = err.message || error.message || `HTTP ${status ?? 'network'}`;
+    err.status = status;
+    return Promise.reject(err);
+  },
+);
+
+export interface FetchOptions {
+  method?: string;
+  params?: Record<string, string | number | boolean | undefined>;
+  headers?: Record<string, string>;
+  /** JSON string (JSON.stringify'd) or FormData for uploads. */
+  body?: unknown;
+  signal?: AbortSignal;
+}
+
+/**
+ * Promise-based request helper on top of the shared axios instance.
+ * Kept as a thin `fetch`-like signature so domain modules stay unchanged.
+ */
+export async function apiFetch<T = any>(path: string, options: FetchOptions = {}): Promise<T> {
+  const { params, headers, body, signal, method } = options;
+
+  // Don't stamp Content-Type on FormData/Blob bodies — axios lets the
+  // browser set the multipart boundary itself.
+  const isBinary =
+    typeof FormData !== 'undefined' && body instanceof FormData ||
+    typeof Blob !== 'undefined' && body instanceof Blob;
+
+  const finalHeaders: Record<string, string> = {
+    ...(body != null && !isBinary ? { 'Content-Type': 'application/json' } : {}),
+    ...headers,
+  };
+
+  const response = await http.request<T>({
+    url: path,
+    method: method ?? (body != null ? 'POST' : 'GET'),
+    params,
+    data: body,
+    headers: finalHeaders,
+    signal,
+  });
+
+  return response.data;
 }

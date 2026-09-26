@@ -1,4 +1,4 @@
-import { API_BASE, getToken } from '@/lib/api/client';
+import { http } from '@/lib/api/client';
 import type { FileMeta, InstanceAttachment } from './types';
 
 export const filesApi = {
@@ -6,45 +6,24 @@ export const filesApi = {
   upload: async (file: File): Promise<FileMeta> => {
     const fd = new FormData();
     fd.append('file', file);
-    const t = getToken();
-    const res = await fetch(`${API_BASE}/files`, {
-      method: 'POST',
-      headers: {
-        ...(t ? { Authorization: `Bearer ${t}` } : {}),
-        // No Content-Type — the browser sets the multipart boundary itself
-      },
-      body: fd,
-    });
-    if (!res.ok) {
-      let msg = `upload failed (${res.status})`;
-      try {
-        const body = await res.json();
-        msg = body.message || body.error || msg;
-      } catch {
-        /* ignore */
-      }
-      throw new Error(msg);
-    }
-    return res.json();
+    // No Content-Type — axios lets the browser set the multipart boundary.
+    const res = await http.post<FileMeta>('/files', fd);
+    return res.data;
   },
 
   /** Download a previously uploaded file as a Blob (caller names the file). */
   download: async (id: string): Promise<Blob> => {
-    const t = getToken();
-    const res = await fetch(`${API_BASE}/files/${id}`, {
-      headers: t ? { Authorization: `Bearer ${t}` } : {},
-    });
-    if (!res.ok) throw new Error(`دانلود فایل ناموفق بود (${res.status})`);
-    return res.blob();
+    try {
+      const res = await http.get<Blob>(`/files/${id}`, { responseType: 'blob' });
+      return res.data;
+    } catch (e) {
+      throw new Error(`دانلود فایل ناموفق بود (${(e as { status?: number }).status ?? ''})`);
+    }
   },
 
   /** List every attachment stamped onto a process instance (uploader info included). */
   byInstance: async (instanceId: string): Promise<InstanceAttachment[]> => {
-    const t = getToken();
-    const res = await fetch(`${API_BASE}/files/by-instance/${instanceId}`, {
-      headers: t ? { Authorization: `Bearer ${t}` } : {},
-    });
-    if (!res.ok) throw new Error(`دریافت پیوست‌ها ناموفق بود (${res.status})`);
-    return res.json();
+    const res = await http.get<InstanceAttachment[]>(`/files/by-instance/${instanceId}`);
+    return res.data;
   },
 };
