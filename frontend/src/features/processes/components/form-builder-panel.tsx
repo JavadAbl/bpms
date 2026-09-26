@@ -15,10 +15,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useZodForm } from '@/hooks/use-zod-form';
 import { useCategories } from '@/features/categories';
 import { CategoryChip } from '@/components/common/option-select';
 import { t } from '@/lib/i18n';
 import { formsApi, processesApi } from '../api';
+import {
+  formBuilderSchema,
+  type FormBuilderField,
+  type FormBuilderValues,
+} from '../schemas';
 import {
   Plus,
   Trash2,
@@ -36,21 +42,9 @@ import {
   Paperclip,
 } from 'lucide-react';
 
-interface FormField {
-  name: string;
-  label: string;
-  type: string;
-  required: boolean;
-  options?: string[];
-  /** Reference to a global reusable category (takes precedence over options). */
-  categoryId?: string;
-  variable?: string;
-  defaultValue?: any;
-  /** Read-only at runtime: shows data filled in previous tasks, user cannot edit. */
-  readOnly?: boolean;
-  /** File fields only: allow multiple attachments (value is always an array of metas). */
-  multiple?: boolean;
-}
+/** A builder field row — the zod schema is the single source of truth
+ * (see formFieldSchema in processes/schemas.ts). */
+type FormField = FormBuilderField;
 
 const FIELD_TYPES = [
   { value: 'text', label: 'متن', icon: Type, color: 'bg-primary/15 text-primary' },
@@ -88,11 +82,20 @@ export function FormBuilderPanel({
   onClose,
   onSaved,
 }: Props) {
-  const [name, setName] = useState(form?.name || '');
-  const [description, setDescription] = useState(form?.description || '');
-  const [fields, setFields] = useState<FormField[]>(
-    (form?.fields || []).map((f: any) => ({ ...f, variable: f.variable || f.name }))
-  );
+  // Zod-backed builder state: form name/description + the field rows. The
+  // schema enforces a form name, per-field labels and unique, valid variable
+  // names — errors render inline (name input, field rows, properties panel).
+  const {
+    values: builder,
+    setValue,
+    errorFor,
+    validate,
+  } = useZodForm<FormBuilderValues>(formBuilderSchema, {
+    name: form?.name || '',
+    description: form?.description || '',
+    fields: (form?.fields || []).map((f: any) => ({ ...f, variable: f.variable || f.name })),
+  });
+  const { name, description, fields } = builder;
   const [selectedField, setSelectedField] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -108,16 +111,14 @@ export function FormBuilderPanel({
       required: false,
       variable: `var_${idx}`,
     };
-    setFields([...fields, newField]);
+    setValue('fields', [...fields, newField]);
     setSelectedField(fields.length);
   };
 
   const patchField = (index: number, patch: Partial<FormField>) => {
-    setFields((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], ...patch };
-      return updated;
-    });
+    const updated = [...fields];
+    updated[index] = { ...updated[index], ...patch };
+    setValue('fields', updated);
   };
 
   const updateField = (index: number, key: keyof FormField, value: any) => {
@@ -155,7 +156,7 @@ export function FormBuilderPanel({
   };
 
   const removeField = (index: number) => {
-    setFields(fields.filter((_, i) => i !== index));
+    setValue('fields', fields.filter((_, i) => i !== index));
     if (selectedField === index) setSelectedField(null);
   };
 
@@ -164,22 +165,23 @@ export function FormBuilderPanel({
     const target = dir === 'up' ? index - 1 : index + 1;
     if (target < 0 || target >= newFields.length) return;
     [newFields[index], newFields[target]] = [newFields[target], newFields[index]];
-    setFields(newFields);
+    setValue('fields', newFields);
   };
 
   const handleSave = async () => {
-    if (!name) {
-      toast({ title: 'خطا', description: 'نام فرم الزامی است', variant: 'destructive' });
-      return;
-    }
     if (!processId) {
       toast({ title: 'خطا', description: 'فرم باید به یک فرآیند تعلق داشته باشد', variant: 'destructive' });
       return;
     }
+    // Zod gate: form name + per-field label/variable integrity (unique,
+    // valid names). Errors render inline — name input, field rows and the
+    // properties panel.
+    const parsed = validate();
+    if (!parsed) return;
     setSaving(true);
     try {
-      await ensureProcessVariables(fields);
-      const data = { name, description, fields, processId };
+      await ensureProcessVariables(parsed.fields);
+      const data = { name: parsed.name, description: parsed.description, fields: parsed.fields, processId };
       if (form) {
         await formsApi.update(form.id, data);
       } else {
@@ -221,11 +223,23 @@ export function FormBuilderPanel({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">نام فرم *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8" />
+              <Input
+                value={name}
+                onChange={(e) => setValue('name', e.target.value)}
+                aria-invalid={!!errorFor('name')}
+                className="h-8"
+              />
+              {errorFor('name') && (
+                <p className="text-xs text-destructive" role="alert">{errorFor('name')}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-xs">توضیحات</Label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} className="h-8" />
+              <Input
+                value={description}
+                onChange={(e) => setValue('description', e.target.value)}
+                className="h-8"
+              />
             </div>
           </div>
         </div>
@@ -307,6 +321,11 @@ export function FormBuilderPanel({
                         </button>
                       </div>
                     </div>
+                    {(errorFor(`fields.${i}.label`) || errorFor(`fields.${i}.variable`)) && (
+                      <p className="text-xs text-destructive mt-1.5" role="alert">
+                        {errorFor(`fields.${i}.label`) || errorFor(`fields.${i}.variable`)}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -324,8 +343,14 @@ export function FormBuilderPanel({
                     <Input
                       value={selectedFieldData.label}
                       onChange={(e) => updateField(selectedField!, 'label', e.target.value)}
+                      aria-invalid={!!errorFor(`fields.${selectedField}.label`)}
                       className="h-8 mt-1"
                     />
+                    {errorFor(`fields.${selectedField}.label`) && (
+                      <p className="text-xs text-destructive mt-1" role="alert">
+                        {errorFor(`fields.${selectedField}.label`)}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs flex items-center gap-1">
@@ -374,10 +399,16 @@ export function FormBuilderPanel({
                         const val = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
                         patchField(selectedField!, { variable: val, name: val });
                       }}
+                      aria-invalid={!!errorFor(`fields.${selectedField}.variable`)}
                       className="h-8 font-mono text-xs"
                       dir="ltr"
                       placeholder="مثال: leaveType"
                     />
+                    {errorFor(`fields.${selectedField}.variable`) && (
+                      <p className="text-xs text-destructive mt-1" role="alert">
+                        {errorFor(`fields.${selectedField}.variable`)}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground/80 mt-1">
                       اگر از لیست انتخاب نکنید، متغیر جدید هنگام ذخیره فرم ایجاد می‌شود
                     </p>

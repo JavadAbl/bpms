@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -24,15 +25,20 @@ export interface FormField {
   variable?: string;
   /** File fields only: allow multiple attachments (value is always an array of metas). */
   multiple?: boolean;
+  /** Runtime-only: default value applied when prefilling empty fields. */
+  defaultValue?: any;
 }
 
 export interface DynamicFormProps {
   fields: FormField[];
   /** Initial values keyed by field name. */
   initialValues?: Record<string, any>;
-  /** Controlled mode: parent passes value + onChange. */
+  /** Controlled mode: parent passes values + onFieldChange. */
   values?: Record<string, any>;
-  onChange?: (values: Record<string, any>) => void;
+  /** Controlled mode: called with (fieldName, value) on every edit. */
+  onFieldChange?: (name: string, value: any) => void;
+  /** Per-field validation errors keyed by field name (rendered inline). */
+  errors?: Record<string, string>;
   /** Read-only mode (used for previews / submission display). */
   readOnly?: boolean;
   /** Required to silence React warning when embedded in form. */
@@ -53,7 +59,8 @@ export function DynamicForm({
   fields,
   initialValues,
   values: controlledValues,
-  onChange,
+  onFieldChange,
+  errors,
   readOnly = false,
   id,
 }: DynamicFormProps) {
@@ -70,12 +77,16 @@ export function DynamicForm({
   const values = controlledValues ?? internalValues;
 
   const setField = (name: string, value: any) => {
-    const next = { ...values, [name]: value };
     if (controlledValues === undefined) {
-      setInternalValues(next);
+      setInternalValues((prev) => ({ ...prev, [name]: value }));
     }
-    onChange?.(next);
+    onFieldChange?.(name, value);
   };
+
+  const fieldError = (name: string) =>
+    errors?.[name] ? (
+      <p className="text-xs text-destructive" role="alert">{errors[name]}</p>
+    ) : null;
 
   // Hide the unknown-types from being rendered (silently)
   const visibleFields = useMemo(
@@ -117,7 +128,9 @@ export function DynamicForm({
                 placeholder={field.placeholder}
                 onChange={(e) => setField(field.name, e.target.value)}
                 disabled={fieldLocked}
+                aria-invalid={!!errors?.[field.name]}
               />
+              {fieldError(field.name)}
             </div>
           );
         }
@@ -133,6 +146,7 @@ export function DynamicForm({
                 onChange={(v) => setField(field.name, v)}
                 disabled={fieldLocked}
               />
+              {fieldError(field.name)}
             </div>
           );
         }
@@ -160,6 +174,7 @@ export function DynamicForm({
                   </label>
                 ))}
               </div>
+              {fieldError(field.name)}
             </div>
           );
         }
@@ -177,6 +192,7 @@ export function DynamicForm({
                 disabled={fieldLocked}
                 fromPreviousTask={!!field.readOnly && !readOnly}
               />
+              {fieldError(field.name)}
             </div>
           );
         }
@@ -200,7 +216,9 @@ export function DynamicForm({
                 )
               }
               disabled={fieldLocked}
+              aria-invalid={!!errors?.[field.name]}
             />
+            {fieldError(field.name)}
           </div>
         );
       })}
@@ -209,8 +227,36 @@ export function DynamicForm({
 }
 
 /**
+ * Builds a zod schema for a dynamic (definition-driven) form on the fly.
+ *
+ * The record keeps every key (values are `z.any()` — the engine stores raw
+ * JSON); the superRefine layer enforces the field rules:
+ *  - required, non-read-only fields must be non-empty (read-only fields
+ *    mirror previous-task data and must never block completion)
+ *  - number fields reject NaN — a half-typed input like "1e-" would otherwise
+ *    JSON-serialize to null and silently corrupt the process variable
+ */
+export function buildDynamicFormSchema(
+  fields: FormField[],
+): z.ZodType<Record<string, any>> {
+  return z.record(z.string(), z.any()).superRefine((values, ctx) => {
+    for (const f of fields) {
+      const v = values[f.name];
+      if (f.type === 'number' && typeof v === 'number' && Number.isNaN(v)) {
+        ctx.addIssue({ code: 'custom', path: [f.name], message: 'مقدار عددی نامعتبر است' });
+        continue;
+      }
+      if (!f.required || f.readOnly) continue;
+      if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) {
+        ctx.addIssue({ code: 'custom', path: [f.name], message: t.requiredField });
+      }
+    }
+  });
+}
+
+/**
  * Validate a dynamic form. Returns a map of fieldName -> error message.
- * Empty object means valid.
+ * Empty object means valid. Zod-backed — see buildDynamicFormSchema.
  * Read-only fields are skipped: they display data from previous tasks and
  * cannot be edited by the current user, so they must never block completion.
  */
@@ -218,13 +264,12 @@ export function validateDynamicForm(
   fields: FormField[],
   values: Record<string, any>,
 ): Record<string, string> {
+  const res = buildDynamicFormSchema(fields).safeParse(values);
+  if (res.success) return {};
   const errors: Record<string, string> = {};
-  for (const f of fields) {
-    if (!f.required || f.readOnly) continue;
-    const v = values[f.name];
-    if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) {
-      errors[f.name] = t.requiredField;
-    }
+  for (const issue of res.error.issues) {
+    const key = issue.path.map(String).join('.');
+    if (!(key in errors)) errors[key] = issue.message;
   }
   return errors;
 }

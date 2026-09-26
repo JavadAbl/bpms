@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processesApi } from '@/features/processes';
@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useZodForm } from '@/hooks/use-zod-form';
+import { startProcessSchema } from '../schemas';
 import { Lock, Play, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -59,11 +61,17 @@ export async function navigateToInstanceEntry(
  * opens the draft form. The real instance starts only when the user submits.
  */
 export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Props) {
-  const [selectedProcess, setSelectedProcess] = useState<string>('');
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const {
+    values: selection,
+    setValue,
+    reset,
+    errorFor,
+    validate,
+  } = useZodForm(startProcessSchema, { processId: '' });
 
   // Startable (ACTIVE + permitted) processes — fetched while the dialog is
   // open via the shared ['processes'] query (deduped with the other views).
@@ -89,10 +97,10 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
 
   useEffect(() => {
     if (!open) return;
-    setSelectedProcess(
+    reset(
       initialProcessId && processes.some((p: any) => p.id === initialProcessId)
-        ? initialProcessId
-        : '',
+        ? { processId: initialProcessId }
+        : { processId: '' },
     );
   }, [open, initialProcessId, processes]);
 
@@ -108,8 +116,9 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
   const starting = startMutation.isPending;
 
   const handleStart = () => {
-    if (!selectedProcess) return;
-    startMutation.mutate(selectedProcess);
+    const parsed = validate();
+    if (!parsed) return;
+    startMutation.mutate(parsed.processId);
   };
 
   return (
@@ -121,8 +130,11 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">{t.selectProcess}</label>
-            <Select value={selectedProcess} onValueChange={setSelectedProcess}>
-              <SelectTrigger>
+            <Select
+              value={selection.processId}
+              onValueChange={(v) => setValue('processId', v)}
+            >
+              <SelectTrigger aria-invalid={!!errorFor('processId')}>
                 <SelectValue placeholder="فرآیند را انتخاب کنید" />
               </SelectTrigger>
               <SelectContent>
@@ -144,6 +156,11 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
                 ))}
               </SelectContent>
             </Select>
+            {errorFor('processId') && (
+              <p className="text-xs text-destructive" role="alert">
+                {errorFor('processId')}
+              </p>
+            )}
             {processes.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 فرآیند فعالی برای شروع در دسترس شما نیست.
@@ -152,7 +169,7 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
           </div>
           <Button
             onClick={handleStart}
-            disabled={!selectedProcess || starting}
+            disabled={starting}
             className="w-full"
           >
             {starting ? (

@@ -21,8 +21,10 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { validateConditionXml } from '@/features/processes/condition-validation';
+import { processDesignSchema, type ProcessDesignValues } from '../schemas';
+import { useZodForm } from '@/hooks/use-zod-form';
 import { DEFAULT_BPMN_XML } from '@/features/processes/components/bpmn/default-bpmn-xml';
-import type { ConditionVariable } from '@/features/processes/components/gateway-condition-modal';
+import type { ConditionVariable } from '@/features/processes/condition-expression';
 
 // Heavy designer pieces are lazy chunks — bpmn-js, the form builder and the
 // modals are by far the largest code in the app and only this route needs
@@ -64,6 +66,7 @@ import {
   Trash2,
   History,
   Users,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface Props {
@@ -99,14 +102,28 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   // ONLY when the user presses ذخیره inside the designer (v4 requirement).
   const isNewMode = !currentProcessId;
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [bpmnXml, setBpmnXml] = useState('');
   const [status, setStatus] = useState('DRAFT');
   const [processVersion, setProcessVersion] = useState(1);
   const [versionsOpen, setVersionsOpen] = useState(false);
   // Bump to force-remount the modeler with fresh XML (e.g. after a version restore)
   const [designerNonce, setDesignerNonce] = useState(0);
+
+  // Zod-backed meta form: name/description/diagram + staged starters.
+  // Validation (name + diagram required; restricted ⇒ ≥1 starter) runs in
+  // handleSave — errors render inline under the name input / as a banner.
+  const {
+    values: design,
+    setValue,
+    setValues,
+    errorFor,
+    validate,
+  } = useZodForm(processDesignSchema, {
+    name: '',
+    description: '',
+    bpmnXml: '',
+    startersRestricted: false,
+    starterIds: [] as string[],
+  });
 
   // Shared reference data via TanStack Query — deduped with the admin views
   // and cached across designer sessions; forms are per-process and only
@@ -130,9 +147,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   const [processVariables, setProcessVariables] = useState<ProcessVariable[]>([]);
   const [activeTab, setActiveTab] = useState<SidebarTab>('forms');
 
-  // ---- process starters (شروع‌کنندگان مجاز) — staged locally, applied on Save ----
-  const [starterIds, setStarterIds] = useState<string[]>([]);
-  const [startersRestricted, setStartersRestricted] = useState(false);
+  // ---- process starters (شروع‌کنندگان مجاز) — staged in the design form, applied on Save ----
   const [startersModalOpen, setStartersModalOpen] = useState(false);
 
   const [editingForm, setEditingForm] = useState<any | null>(null);
@@ -158,17 +173,20 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       processesApi.getAssignments(pid),
       processesApi.getVariables(pid),
     ]);
-    setName(proc.name);
-    setDescription(proc.description || '');
-    setBpmnXml(proc.bpmnXml);
     setStatus(proc.status);
     setProcessVersion(proc.version || 1);
     setUserTasks(userTasksData);
     setProcessVariables(variablesData);
     // Process starters — empty list means every user may start
     const serverStarters: string[] = (proc.starters || []).map((s: any) => s.userId);
-    setStarterIds(serverStarters);
-    setStartersRestricted(serverStarters.length > 0);
+    setValues((prev) => ({
+      ...prev,
+      name: proc.name,
+      description: proc.description || '',
+      bpmnXml: proc.bpmnXml,
+      startersRestricted: serverStarters.length > 0,
+      starterIds: serverStarters,
+    }));
     const map: Record<string, any> = {};
     existingAssignments.forEach((a: any) => {
       map[a.taskName] = {
@@ -193,13 +211,15 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         } else {
           // "new" mode — NOTHING is created on the server here. The process row
           // is created only when the user presses «ذخیره» (see handleSave).
-          setName('');
-          setDescription('');
-          setBpmnXml(DEFAULT_BPMN_XML);
+          setValues({
+            name: '',
+            description: '',
+            bpmnXml: DEFAULT_BPMN_XML,
+            startersRestricted: false,
+            starterIds: [],
+          });
           setStatus('DRAFT');
           setProcessVersion(1);
-          setStarterIds([]);
-          setStartersRestricted(false);
           // positions / users / forms arrive via the shared queries (forms stay
           // empty until the process row exists)
           setProcessVariables([]);
@@ -253,7 +273,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   );
 
   const handleXmlChange = useCallback((xml: string) => {
-    setBpmnXml(xml);
+    setValue('bpmnXml', xml);
     const taskRegex =
       /<(?:bpmn:|bpmn2:)userTask\b([^>]*?)\/?>(?:[\s\S]*?<\/(?:bpmn:|bpmn2:)userTask>)?/g;
     const tasks: any[] = [];
@@ -269,26 +289,17 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
 
   // Save flow — one mutation covering both branches ("new" creates the row,
   // edit PATCHes it); invalidations refresh the process list + dashboard.
-  // Validation stays in the sync handleSave wrapper so the mutation only
-  // fires on valid input.
+  // Validation runs in the sync handleSave wrapper (zod schema + condition
+  // XML gate) so the mutation only fires on valid input.
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (v: ProcessDesignValues) => {
       if (!currentProcessId) {
         // ---- "new" mode: THIS is the only place a process row gets created ----
-        const finalStarterIds = startersRestricted ? starterIds : [];
-        if (finalStarterIds.length === 0 && startersRestricted) {
-          toast({
-            title: 'خطا',
-            description: 'اگر شروع فرآیند محدود است، حداقل یک کاربر را انتخاب کنید',
-            variant: 'destructive',
-          });
-          return;
-        }
         const created = await processesApi.create({
-          name,
-          description,
-          bpmnXml,
-          starterIds: finalStarterIds,
+          name: v.name,
+          description: v.description,
+          bpmnXml: v.bpmnXml,
+          starterIds: v.startersRestricted ? v.starterIds : [],
         });
         setCurrentProcessId(created.id);
         setStatus(created.status || 'DRAFT');
@@ -317,7 +328,11 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         toast({ title: 'موفقیت', description: 'فرآیند ایجاد و ذخیره شد' });
       } else {
         // ---- edit mode: PATCH (new version row only when XML really changed) ----
-        const updated = await processesApi.update(currentProcessId, { name, description, bpmnXml });
+        const updated = await processesApi.update(currentProcessId, {
+          name: v.name,
+          description: v.description,
+          bpmnXml: v.bpmnXml,
+        });
         setProcessVersion(updated.version || processVersion);
 
         if (userTasks.length > 0) {
@@ -338,7 +353,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         // Starters are process-level config (not versioned) — apply on save
         await processesApi.setStarters(
           currentProcessId,
-          startersRestricted ? starterIds : [],
+          v.startersRestricted ? v.starterIds : [],
         );
 
         toast({ title: 'موفقیت', description: 'فرآیند ذخیره شد' });
@@ -352,13 +367,14 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   const saving = saveMutation.isPending;
 
   const handleSave = () => {
-    if (!name || !bpmnXml) {
-      toast({ title: 'خطا', description: 'نام و طراحی فرآیند الزامی است', variant: 'destructive' });
-      return;
-    }
+    // Zod gate (processDesignSchema): name + drawn diagram required, and a
+    // restricted process needs at least one starter. The name error renders
+    // inline under the input; xml/starter errors render as a header banner.
+    const parsed = validate();
+    if (!parsed) return;
     // Save-time gate: reject XML whose gateway conditions the engine would
     // mis-evaluate (same rules as the backend — defense in depth)
-    const conditionIssues = validateConditionXml(bpmnXml);
+    const conditionIssues = validateConditionXml(parsed.bpmnXml);
     if (conditionIssues.length > 0) {
       toast({
         title: 'ذخیره انجام نشد — شرط نامعتبر',
@@ -368,7 +384,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       });
       return;
     }
-    saveMutation.mutate();
+    saveMutation.mutate(parsed);
   };
 
   const activateMutation = useMutation({
@@ -384,7 +400,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   const handleActivate = () => {
     if (!currentProcessId) return;
     // Same gate as save: activation with broken conditions would hang/misroute instances
-    const conditionIssues = bpmnXml ? validateConditionXml(bpmnXml) : [];
+    const conditionIssues = design.bpmnXml ? validateConditionXml(design.bpmnXml) : [];
     if (conditionIssues.length > 0) {
       toast({
         title: 'فعال‌سازی انجام نشد — شرط نامعتبر',
@@ -443,16 +459,22 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             بازگشت
           </Button>
           <Separator orientation="vertical" className="h-6" />
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="نام فرآیند (الزامی)"
-            className="w-64 h-9 bg-muted/60 border-border/60 focus-visible:bg-card"
-          />
+          <div className="grid gap-1 min-w-0">
+            <Input
+              value={design.name}
+              onChange={(e) => setValue('name', e.target.value)}
+              placeholder="نام فرآیند (الزامی)"
+              aria-invalid={!!errorFor('name')}
+              className="w-64 h-9 bg-muted/60 border-border/60 focus-visible:bg-card"
+            />
+            {errorFor('name') && (
+              <p className="text-xs text-destructive" role="alert">{errorFor('name')}</p>
+            )}
+          </div>
           {isNewMode && (
             <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={design.description}
+              onChange={(e) => setValue('description', e.target.value)}
               placeholder="توضیحات (اختیاری)"
               className="w-56 h-9 bg-muted/60 border-border/60 focus-visible:bg-card hidden lg:block"
             />
@@ -473,14 +495,14 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             onClick={() => setStartersModalOpen(true)}
             title="تعیین کاربران مجاز به شروع فرآیند"
             className={`state-layer inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium cursor-pointer transition-shadow hover:shadow-elev-1 ${
-              startersRestricted
+              design.startersRestricted
                 ? 'bg-warning/15 text-warning'
                 : 'bg-muted text-muted-foreground'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            {startersRestricted
-              ? `شروع: ${starterIds.length.toLocaleString('fa-IR')} کاربر`
+            {design.startersRestricted
+              ? `شروع: ${design.starterIds.length.toLocaleString('fa-IR')} کاربر`
               : 'شروع: همه کاربران'}
           </button>
           {currentProcessId && (
@@ -517,12 +539,23 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         </div>
       </header>
 
+      {/* Zod validation banner — diagram/starter issues that have no inline spot */}
+      {(errorFor('bpmnXml') || errorFor('starterIds')) && (
+        <div
+          className="flex items-center gap-2 px-4 py-2 bg-destructive/10 border-b border-destructive/25 text-xs text-destructive"
+          role="alert"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          {errorFor('bpmnXml') || errorFor('starterIds')}
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
           <BpmnDesigner
             key={designerNonce}
             onXmlChange={handleXmlChange}
-            initialXml={bpmnXml || undefined}
+            initialXml={design.bpmnXml || undefined}
             onAssignmentAction={handleAssignmentFromContext}
             onConditionAction={handleConditionAction}
             onStartersAction={() => setStartersModalOpen(true)}
@@ -615,11 +648,11 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         <ProcessStartersModal
           open={startersModalOpen}
           users={users}
-          restricted={startersRestricted}
-          starterIds={starterIds}
+          restricted={design.startersRestricted}
+          starterIds={design.starterIds}
           onChange={(restricted, ids) => {
-            setStartersRestricted(restricted);
-            setStarterIds(ids);
+            setValue('startersRestricted', restricted);
+            setValue('starterIds', ids);
           }}
           onClose={() => setStartersModalOpen(false)}
         />
@@ -639,12 +672,12 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         <ProcessVersionsDialog
           open={versionsOpen}
           processId={currentProcessId}
-          processName={name}
+          processName={design.name}
           currentVersion={processVersion}
           onClose={() => setVersionsOpen(false)}
           onRestored={(proc) => {
             // Restore changed the current XML under us — reload it into the canvas
-            setBpmnXml(proc.bpmnXml);
+            setValue('bpmnXml', proc.bpmnXml);
             setProcessVersion(proc.version || processVersion + 1);
             setDesignerNonce((n) => n + 1);
             toast({ title: 'بازگردانی انجام شد', description: `نسخه ${proc.version} به‌عنوان نسخه فعلی ذخیره شد` });

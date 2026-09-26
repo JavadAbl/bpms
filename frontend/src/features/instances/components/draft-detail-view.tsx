@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processDraftsApi } from '../api';
@@ -23,9 +23,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   DynamicForm,
-  validateDynamicForm,
+  buildDynamicFormSchema,
   type FormField,
 } from '@/components/common/dynamic-form';
+import { useZodForm } from '@/hooks/use-zod-form';
 import { navigateToInstanceEntry } from '@/features/instances/components/start-process-dialog';
 import {
   ArrowRight,
@@ -48,7 +49,6 @@ export function DraftDetailView({ draftId, onBack }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState<Record<string, any>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: draft, isPending } = useQuery({
@@ -57,6 +57,22 @@ export function DraftDetailView({ draftId, onBack }: Props) {
   });
   const loading = isPending;
 
+  // Zod-backed dynamic form: schema is built from the draft's field
+  // definitions; errors render inline under each field (via DynamicForm).
+  const formSchema = useMemo(
+    () => buildDynamicFormSchema(draft?.form?.fields || []),
+    // schema is derived solely from the draft definition
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draft],
+  );
+  const {
+    values: formData,
+    setValue,
+    setValues,
+    errors,
+    validate,
+  } = useZodForm<Record<string, any>>(formSchema, {});
+
   // Seed the editable form from the saved draft data (+ field defaults)
   useEffect(() => {
     if (!draft) return;
@@ -64,10 +80,10 @@ export function DraftDetailView({ draftId, onBack }: Props) {
     const prefill: Record<string, any> = { ...(draft.formData || {}) };
     for (const f of fields) {
       if (prefill[f.name] === undefined && f.defaultValue !== undefined) {
-        prefill[f.name] = (f as any).defaultValue;
+        prefill[f.name] = f.defaultValue;
       }
     }
-    setFormData(prefill);
+    setValues(prefill);
   }, [draft]);
 
   const saveMutation = useMutation({
@@ -108,19 +124,11 @@ export function DraftDetailView({ draftId, onBack }: Props) {
   const handleSave = () => saveMutation.mutate(formData);
 
   const handleSubmit = () => {
-    const fields: FormField[] = draft?.form?.fields || [];
-    const errors = validateDynamicForm(fields, formData);
-    if (Object.keys(errors).length > 0) {
-      const firstMsg = Object.values(errors)[0];
-      const firstField = fields.find((f) => errors[f.name]);
-      toast({
-        title: t.invalidFormTitle,
-        description: `${firstField?.label || ''}: ${firstMsg}`.trim(),
-        variant: 'destructive',
-      });
-      return;
-    }
-    submitMutation.mutate(formData);
+    // Zod validation against the draft's field definitions; a draft SAVE
+    // stays unvalidated on purpose (partial drafts are allowed).
+    const parsed = validate();
+    if (!parsed) return;
+    submitMutation.mutate(parsed);
   };
 
   const handleDelete = () => {
@@ -210,7 +218,8 @@ export function DraftDetailView({ draftId, onBack }: Props) {
             <DynamicForm
               fields={fields}
               values={formData}
-              onChange={setFormData}
+              onFieldChange={setValue}
+              errors={errors}
             />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-6">

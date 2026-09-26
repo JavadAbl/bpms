@@ -20,16 +20,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertTriangle, ArrowRight, FlaskConical, Play, Trash2, Zap } from 'lucide-react';
-
-export interface ConditionVariable {
-  name: string;
-  label?: string;
-  type: string;
-  /** Selectable values of select/radio variables — resolved the SAME way the
-  *  runtime form renders them: category items (Persian labels) or inline
-  *  options. Keeps the no-code builder in sync with what users submit. */
-  options?: { value: string; label: string }[];
-}
+import {
+  buildFinalBody,
+  buildSimpleExpression,
+  NEXT_WRAPPER_RE,
+  parseSimple,
+  unwrapNext,
+  type ConditionRow,
+  type ConditionVariable,
+} from '../condition-expression';
+import { validateGatewayRows } from '../schemas';
 
 interface Props {
   open: boolean;
@@ -40,21 +40,10 @@ interface Props {
   onClose: () => void;
 }
 
-interface FlowRow {
-  flowId: string;
+interface FlowRow extends ConditionRow {
   flowBoId: string;
   targetLabel: string;
-  mode: 'simple' | 'expression';
-  variable: string;
-  operator: string;
-  value: string;
-  expression: string;
-  isDefault: boolean;
-  /** raw body as currently stored in the BPMN XML ('' when none) */
-  initialBody: string;
   initialDefault: boolean;
-  /** true when the stored body is a hand-written script (not our next(...) wrapper) */
-  rawScript: boolean;
 }
 
 const OPERATORS = [
@@ -65,59 +54,6 @@ const OPERATORS = [
   { value: '<', label: 'کوچکتر از (<)' },
   { value: '<=', label: 'کوچکتر یا مساوی (<=)' },
 ];
-
-/**
- * Matches the engine's script-wrapper format:
- *   next(null, <js expression>)
- * The bpmn-engine Scripts module runs `language="javascript"` conditions in a
- * node vm context where `next` is the completion callback — a condition MUST
- * call next(err, result) to resolve, otherwise the gateway hangs.
- */
-const NEXT_WRAPPER_RE = /^\s*next\s*\(\s*(?:null|undefined)\s*,\s*([\s\S]+?)\s*\)\s*;?\s*$/;
-
-/** Matches a simple condition: environment.variables.x OP value */
-const SIMPLE_RE =
-  /^\s*environment\.variables\.([A-Za-z0-9_]+)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+?)\s*;?\s*$/;
-
-function unwrapNext(body: string): { inner: string; wrapped: boolean } | null {
-  if (!body) return null;
-  const m = body.match(NEXT_WRAPPER_RE);
-  if (m) return { inner: m[1], wrapped: true };
-  return null;
-}
-
-function parseSimple(inner: string): { variable: string; operator: string; value: string } | null {
-  const m = inner.match(SIMPLE_RE);
-  if (!m) return null;
-  const operator = m[2] === '===' ? '==' : m[2] === '!==' ? '!=' : m[2];
-  let value = m[3];
-  const strMatch = value.match(/^(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")$/);
-  if (strMatch) {
-    value = (strMatch[1] ?? strMatch[2]).replace(/\\'/g, "'").replace(/\\"/g, '"');
-  }
-  return { variable: m[1], operator, value };
-}
-
-/** Builds the JS expression for simple mode (returns null when invalid). */
-function buildSimpleExpression(
-  row: { variable: string; operator: string; value: string },
-  variables: ConditionVariable[],
-): string | null {
-  if (!row.variable) return null;
-  const meta = variables.find((v) => v.name === row.variable);
-  const raw = row.value.trim();
-  if (raw === '') return null;
-  let literal: string;
-  if (meta && (meta.type === 'number' || meta.type === 'integer' || meta.type === 'float')) {
-    if (!/^-?\d+(\.\d+)?$/.test(raw)) return null;
-    literal = raw;
-  } else if (meta && (meta.type === 'checkbox' || meta.type === 'boolean')) {
-    literal = raw === 'true' ? 'true' : 'false';
-  } else {
-    literal = `'${raw.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-  }
-  return `environment.variables.${row.variable} ${row.operator} ${literal}`;
-}
 
 /* ===================== dry-run tester ===================== */
 
@@ -293,64 +229,22 @@ export function GatewayConditionModal({ open, element, modeler, variables, onClo
     return trimmed ? `next(null, ${trimmed})` : null;
   };
 
-  /** body that will be saved for this row ('' = remove condition) */
-  const rowFinalBody = (row: FlowRow): string | null => {
-    if (row.isDefault) return null; // default flow carries no condition
-    if (row.rawScript) return row.initialBody; // never touch foreign scripts
-    if (row.mode === 'simple') {
-      const expr = buildSimpleExpression(row, variables);
-      return expr ? `next(null, ${expr})` : null;
-    }
-    const trimmed = row.expression.trim();
-    if (!trimmed) return null;
-    // Avoid double-wrapping if the user already wrote the next(...) call
-    return NEXT_WRAPPER_RE.test(trimmed) ? trimmed : `next(null, ${trimmed})`;
-  };
+  /** body that will be saved for this row ('' = remove condition) —
+   *  shared implementation lives in the slice (condition-expression.ts) so
+   *  the zod save-validation and this modal can never drift apart. */
+  const rowFinalBody = (row: FlowRow): string | null => buildFinalBody(row, variables);
 
   const handleSave = () => {
     if (!analysis || !modeler) return;
     const modeling = modeler.get('modeling');
     const moddle = modeler.get('moddle');
     const registry = modeler.get('elementRegistry');
-    const newErrors: Record<string, string> = {};
 
-    // ---- PASS 1: validate every row first — nothing is applied unless all
-    // rows are valid. This rejects invalid JS expressions at save time.
-    for (const row of rows) {
-      const finalBody = rowFinalBody(row);
-
-      // Validation: simple mode with partial/invalid input
-      if (!row.isDefault && !row.rawScript && row.mode === 'simple') {
-        const meta = variables.find((v) => v.name === row.variable);
-        const invalidNumber =
-          meta &&
-          ['number', 'integer', 'float'].includes(meta.type) &&
-          row.value.trim() !== '' &&
-          !/^-?\d+(\.\d+)?$/.test(row.value.trim());
-        const hasPartial = row.variable !== '' || row.value.trim() !== '';
-        if (invalidNumber) {
-          newErrors[row.flowId] = 'مقدار عددی نامعتبر است';
-          continue;
-        }
-        if (hasPartial && !finalBody) {
-          newErrors[row.flowId] = 'انتخاب متغیر و مقدار الزامی است';
-          continue;
-        }
-      }
-
-      // Syntax-check the exact script body the engine will compile.
-      // new Function compiles WITHOUT running — a SyntaxError here means the
-      // engine would throw at runtime, so the save is rejected.
-      if (finalBody) {
-        try {
-          // eslint-disable-next-line no-new-func
-          new Function('next', 'environment', finalBody);
-        } catch (e: any) {
-          newErrors[row.flowId] = `عبارت جاوااسکریپت نامعتبر است: ${e?.message || e}`;
-        }
-      }
-    }
-
+    // ---- PASS 1: validate every row first (zod, see processes/schemas.ts) —
+    // nothing is applied unless ALL rows are valid. Rejects half-filled
+    // simple conditions, non-numeric values on numeric variables and JS
+    // expressions that would fail to compile in the engine's vm.
+    const newErrors = validateGatewayRows(rows, variables);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;

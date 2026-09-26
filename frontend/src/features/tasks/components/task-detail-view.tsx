@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '../api';
@@ -18,7 +18,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { OptionSelect } from '@/components/common/option-select';
 import { FileUploadField } from '@/features/files/components/file-upload-field';
-import { validateDynamicForm } from '@/components/common/dynamic-form';
+import { buildDynamicFormSchema } from '@/components/common/dynamic-form';
+import { useZodForm } from '@/hooks/use-zod-form';
 import {
   ArrowRight,
   Hand,
@@ -48,7 +49,6 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState<Record<string, any>>({});
 
   const { data: task, isPending, error, refetch } = useQuery({
     queryKey: ['tasks', 'detail', taskId],
@@ -58,6 +58,23 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   // کارتابل privacy: another user's task → access-denied state, not a toast
   // (the global query error handler skips 403s for exactly this reason)
   const denied = (error as any)?.status === 403;
+
+  // Zod-backed dynamic form: the schema is built from the task's field
+  // definitions, so required/number rules always match what the engine
+  // expects. Errors render inline under each editable field.
+  const formSchema = useMemo(
+    () => buildDynamicFormSchema(task?.form?.fields || []),
+    // schema is derived solely from the task definition
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [task],
+  );
+  const {
+    values: formData,
+    setValue,
+    setValues,
+    errorFor,
+    validate,
+  } = useZodForm<Record<string, any>>(formSchema, {});
 
   // Pre-fill the form whenever fresh task data arrives:
   //  1. Data filled in PREVIOUS tasks of this instance (process variables)
@@ -87,7 +104,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
         Object.assign(prefill, JSON.parse(latest.data));
       } catch {}
     }
-    setFormData(prefill);
+    setValues(prefill);
   }, [task]);
 
   const refreshAfterAction = () => {
@@ -130,25 +147,17 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   const fields: any[] = task?.form?.fields || [];
 
   const handleComplete = () => {
-    // Client-side validation: required editable fields must be filled.
-    // Read-only fields are excluded (they display previous tasks' data and
-    // cannot be edited — see validateDynamicForm).
-    const errors = validateDynamicForm(fields, formData);
-    if (Object.keys(errors).length > 0) {
-      const firstMsg = Object.values(errors)[0];
-      const firstField = fields.find((f: any) => errors[f.name]);
-      toast({
-        title: t.invalidFormTitle,
-        description: `${firstField?.label || ''}: ${firstMsg}`.trim(),
-        variant: 'destructive',
-      });
-      return;
-    }
+    // Zod validation (schema mirrors the field definitions): required
+    // editable fields must be filled; read-only fields are excluded — they
+    // display previous tasks' data and cannot be edited. Errors render
+    // inline under each field.
+    const parsed = validate();
+    if (!parsed) return;
     // Read-only fields are display-only mirrors of process variables:
     // keep them when they carry a value (re-saving the same variable is
     // harmless), but never submit an EMPTY read-only field — that would
     // overwrite a real variable with an empty value.
-    const payload: Record<string, any> = { ...formData };
+    const payload: Record<string, any> = { ...parsed };
     for (const f of fields) {
       if (!f.readOnly) continue;
       const v = payload[f.name];
@@ -330,7 +339,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
                           )}
                       </div>
                       {renderField(field, formData[field.name], (val) =>
-                        setFormData({ ...formData, [field.name]: val }),
+                        setValue(field.name, val),
                       )}
                       {formData[field.name] === undefined ||
                       formData[field.name] === null ||
@@ -350,7 +359,12 @@ export function TaskDetailView({ taskId, onBack }: Props) {
                         {field.required && <span className="text-destructive">*</span>}
                       </label>
                       {renderField(field, formData[field.name], (val) =>
-                        setFormData({ ...formData, [field.name]: val }),
+                        setValue(field.name, val),
+                      )}
+                      {errorFor(field.name) && (
+                        <p className="text-xs text-destructive" role="alert">
+                          {errorFor(field.name)}
+                        </p>
                       )}
                     </div>
                   ),
