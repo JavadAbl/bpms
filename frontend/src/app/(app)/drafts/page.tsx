@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { DraftsView } from '@/components/views/drafts-view';
+import { DraftsView } from '@/features/instances/components/drafts-view';
 
 export default function DraftsPage() {
   const router = useRouter();

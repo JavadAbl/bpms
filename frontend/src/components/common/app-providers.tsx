@@ -3,7 +3,7 @@
 import { ReactNode, useState } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
-import { AuthProvider } from '@/lib/auth';
+import { AuthProvider } from '@/features/auth';
 
 /**
  * App-wide client providers that must live above every route

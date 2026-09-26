@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { t } from '@/lib/i18n';
 import { OptionSelect } from '@/components/common/option-select';
-import { FileUploadField } from '@/components/common/file-upload-field';
+import { FileUploadField } from '@/features/files/components/file-upload-field';
 
 export interface FormField {
   name: string;

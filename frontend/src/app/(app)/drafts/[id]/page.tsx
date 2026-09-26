@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { DraftDetailView } from '@/components/views/draft-detail-view';
+import { DraftDetailView } from '@/features/instances/components/draft-detail-view';
 import { Breadcrumbs } from '@/components/shell/breadcrumbs';
 import { t } from '@/lib/i18n';
 

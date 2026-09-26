@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/features/auth';
 
 /**
  * ADMIN-only area guard (UI redesign Phase 2).

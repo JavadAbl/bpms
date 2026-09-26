@@ -4,7 +4,7 @@ import { Tags } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { t } from '@/lib/i18n';
-import { useCategories } from '@/hooks/use-categories';
+import { useCategories } from '@/features/categories';
 
 interface OptionSelectProps {
   /** When set, options come from this global category (item.value stored, item.label shown). */

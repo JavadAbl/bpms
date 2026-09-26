@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
-import { LoginView } from '@/components/views/login-view';
+import { useAuth } from '@/features/auth';
+import { LoginView } from '@/features/auth/components/login-view';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**

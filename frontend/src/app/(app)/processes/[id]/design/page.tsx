@@ -2,8 +2,8 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
-import { ProcessDesignerView } from '@/components/views/process-designer-view';
+import { useAuth } from '@/features/auth';
+import { ProcessDesignerView } from '@/features/processes/components/process-designer-view';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 

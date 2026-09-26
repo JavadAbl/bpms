@@ -1,6 +1,6 @@
 'use client';
 
-import { UsersView } from '@/components/views/users-view';
+import { UsersView } from '@/features/users/components/users-view';
 
 export default function AdminUsersPage() {
   return <UsersView />;

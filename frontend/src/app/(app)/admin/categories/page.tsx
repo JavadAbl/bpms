@@ -1,6 +1,6 @@
 'use client';
 
-import { CategoriesView } from '@/components/views/categories-view';
+import { CategoriesView } from '@/features/categories/components/categories-view';
 
 export default function AdminCategoriesPage() {
   return <CategoriesView />;

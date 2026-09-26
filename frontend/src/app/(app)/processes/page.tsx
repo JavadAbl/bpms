@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ProcessesView } from '@/components/views/processes-view';
+import { ProcessesView } from '@/features/processes/components/processes-view';
 
 export default function ProcessesPage() {
   const router = useRouter();

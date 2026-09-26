@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/features/auth';
 import { t } from '@/lib/i18n';
-import { tasksApi, processesApi } from '@/lib/api';
+import { tasksApi } from '@/features/tasks';
+import { processesApi } from '@/features/processes';
 import {
   CommandDialog,
   CommandInput,

@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { InstanceDetailView } from '@/components/views/instance-detail-view';
+import { InstanceDetailView } from '@/features/instances/components/instance-detail-view';
 import { Breadcrumbs } from '@/components/shell/breadcrumbs';
 import { t } from '@/lib/i18n';
 

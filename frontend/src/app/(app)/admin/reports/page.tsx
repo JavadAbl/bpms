@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ReportsView } from '@/components/views/reports-view';
+import { ReportsView } from '@/features/reports/components/reports-view';
 
 export default function AdminReportsPage() {
   const router = useRouter();

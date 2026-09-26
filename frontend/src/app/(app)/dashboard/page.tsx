@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { DashboardView } from '@/components/views/dashboard-view';
+import { DashboardView } from '@/features/dashboard/components/dashboard-view';
 
 /**
  * Dashboard landing (UI redesign Phase 3) — thin wrapper delegating to

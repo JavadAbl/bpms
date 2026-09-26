@@ -4,7 +4,7 @@ import { useEffect, useState, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/features/auth';
 import { t, statusColors, roleLabel } from '@/lib/i18n';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { CommandPalette } from '@/components/shell/command-palette';
-import { StartProcessDialog } from '@/components/processes/start-process-dialog';
+import { StartProcessDialog } from '@/features/instances/components/start-process-dialog';
 import {
   ClipboardList,
   GitBranch,

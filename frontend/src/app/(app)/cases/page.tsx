@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { CasesView } from '@/components/views/cases-view';
+import { CasesView } from '@/features/instances/components/cases-view';
 
 /**
  * پرونده‌ها — the single case list (merged instances report + participated

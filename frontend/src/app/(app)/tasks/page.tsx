@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TasksView } from '@/components/views/tasks-view';
+import { TasksView } from '@/features/tasks/components/tasks-view';
 
 export default function TasksPage() {
   const router = useRouter();

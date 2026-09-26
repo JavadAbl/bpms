@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { TaskDetailView } from '@/components/views/task-detail-view';
+import { TaskDetailView } from '@/features/tasks/components/task-detail-view';
 import { Breadcrumbs } from '@/components/shell/breadcrumbs';
 import { t } from '@/lib/i18n';
 

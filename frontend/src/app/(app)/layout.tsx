@@ -2,7 +2,7 @@
 
 import { useEffect, ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/features/auth';
 import { AppShell } from '@/components/shell/app-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 
