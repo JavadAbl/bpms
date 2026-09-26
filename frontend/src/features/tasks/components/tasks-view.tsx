@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { tasksApi } from '../api';
+import { useMyTasks, useClaimTask } from '../hooks';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -52,24 +51,12 @@ const statusChipSx: Record<string, Record<string, unknown>> = {
 export function TasksView({ onViewTask }: Props) {
   const [search, setSearch] = useState('');
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // کارتابل = received (pending) tasks only — /tasks/mine is the inbox.
-  const { data, isPending, refetch } = useQuery({
-    queryKey: ['tasks', 'mine'],
-    queryFn: () => tasksApi.mine(),
-  });
-  const tasks = data ?? [];
-  const loading = isPending;
+  const { tasks, loading, refetch } = useMyTasks();
 
-  const claimMutation = useMutation({
-    mutationFn: (taskId: string) => tasksApi.claim(taskId),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'وظیفه ادعا شد' });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['process-instances'] });
-    },
+  const claimMutation = useClaimTask({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'وظیفه ادعا شد' }),
   });
   const actionLoading = claimMutation.isPending ? claimMutation.variables : null;
 

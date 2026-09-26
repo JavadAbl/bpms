@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../api';
+import { useUsers, useDeleteUser, useInvalidateUsers } from '../hooks';
 import { createUserSchema, updateUserSchema, USER_ROLES } from '../schemas';
 import type { UserFormValues } from '../schemas';
 import { useZodForm } from '@/hooks/use-zod-form';
@@ -52,21 +52,12 @@ export function UsersView() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data, isPending, refetch } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => usersApi.findAll(),
-  });
-  const users = data ?? [];
-  const loading = isPending;
+  const { users, loading, refetch } = useUsers();
+  const invalidateUsers = useInvalidateUsers();
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => usersApi.remove(id),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'کاربر حذف شد' });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
+  const deleteMutation = useDeleteUser({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'کاربر حذف شد' }),
   });
 
   const handleDelete = (id: string) => {
@@ -242,7 +233,7 @@ export function UsersView() {
           onSaved={() => {
             setShowCreate(false);
             setEditUser(null);
-            queryClient.invalidateQueries({ queryKey: ['users'] });
+            invalidateUsers();
           }}
         />
       )}

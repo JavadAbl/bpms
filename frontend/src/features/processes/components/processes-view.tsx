@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processesApi } from '../api';
+import { useProcesses, useDeleteProcess, useActivateProcess } from '../hooks';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,14 +46,8 @@ export function ProcessesView({ onOpenDesigner }: Props) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data, isPending, refetch } = useQuery({
-    queryKey: ['processes'],
-    queryFn: () => processesApi.findAll(),
-  });
-  const processes = data ?? [];
-  const loading = isPending;
+  const { processes, loading, refetch } = useProcesses();
 
   // ---- read-only preview dialog state ----
   const [previewProcess, setPreviewProcess] = useState<{ id: string; name: string } | null>(null);
@@ -75,22 +69,12 @@ export function ProcessesView({ onOpenDesigner }: Props) {
     }
   };
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => processesApi.remove(id),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'فرآیند حذف شد' });
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    },
+  const deleteMutation = useDeleteProcess({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'فرآیند حذف شد' }),
   });
 
-  const activateMutation = useMutation({
-    mutationFn: (id: string) => processesApi.update(id, { status: 'ACTIVE' }),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'فرآیند فعال شد' });
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    },
+  const activateMutation = useActivateProcess({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'فرآیند فعال شد' }),
   });
 
   const handleDelete = (id: string) => {

@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { processInstancesApi } from '../api';
-import { filesApi, InstanceAttachment } from '@/features/files';
+import { useInstanceDetail } from '../hooks';
+import { filesApi, useInstanceFiles, InstanceAttachment } from '@/features/files';
 import { t, statusColors } from '@/lib/i18n';
 import { formatPersianDate, formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -39,10 +38,7 @@ interface Props {
 export function InstanceDetailView({ instanceId, onBack }: Props) {
   const { toast } = useToast();
 
-  const { data: instance, isPending, error } = useQuery({
-    queryKey: ['process-instances', 'detail', instanceId],
-    queryFn: () => processInstancesApi.findOne(instanceId),
-  });
+  const { data: instance, isPending, error } = useInstanceDetail(instanceId);
   const loading = isPending;
   // کارتابل privacy: instances the user does not participate in → denied state
   // (the global query error handler skips 403s for exactly this reason)
@@ -235,10 +231,7 @@ function AttachmentsPanel({ instanceId }: { instanceId: string }) {
   const { toast } = useToast();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const { data: files, error: loadError, refetch } = useQuery({
-    queryKey: ['files', 'by-instance', instanceId],
-    queryFn: () => filesApi.byInstance(instanceId),
-  });
+  const { data: files, error: loadError, refetch } = useInstanceFiles(instanceId);
 
   const download = async (f: InstanceAttachment) => {
     setDownloadingId(f.id);

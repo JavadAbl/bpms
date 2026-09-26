@@ -2,16 +2,17 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
+  Pencil,
   Play,
+  Plus,
   RefreshCw,
   Trash2,
 } from 'lucide-react';
 import { IconButton } from '@mui/material';
 import type { GridColDef } from '@mui/x-data-grid';
-import { reportsApi } from '../api';
+import { useReports, useDeleteReport } from '../hooks';
 import { type ReportDefinition } from '../types';
 import { t } from '@/lib/i18n';
 import { formatPersianDate } from '@/lib/format';
@@ -40,33 +41,27 @@ const ReportRunnerDialog = dynamic(
 
 interface Props {
   onViewInstance: (id: string) => void;
+  /** Open the builder: without id = create, with id = edit that definition. */
+  onBuild: (reportId?: string) => void;
 }
 
 /**
  * گزارش‌ساز (v7) — admin report landing page.
- * Lists the saved report definitions; each row runs / deletes.
+ * Lists the saved report definitions; each row runs / edits / deletes.
  * ADMIN-only route (guarded by the /admin layout).
  */
-export function ReportsView({ onViewInstance }: Props) {
+export function ReportsView({ onViewInstance, onBuild }: Props) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data, isPending, refetch } = useQuery({
-    queryKey: ['reports'],
-    queryFn: () => reportsApi.findAll(),
-  });
-  const reports = data ?? [];
-  const loading = isPending;
+  const { reports, loading, refetch } = useReports();
 
   const [running, setRunning] = useState<ReportDefinition | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReportDefinition | null>(null);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => reportsApi.remove(id),
+  const deleteMutation = useDeleteReport({
     onSuccess: () => {
       toast({ title: 'موفقیت', description: t.reportDeleted });
       setDeleteTarget(null);
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
   });
 
@@ -139,7 +134,7 @@ export function ReportsView({ onViewInstance }: Props) {
     {
       field: 'actions',
       headerName: t.actions,
-      width: 150,
+      width: 190,
       sortable: false,
       renderCell: (p) => (
         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -154,6 +149,18 @@ export function ReportsView({ onViewInstance }: Props) {
             onClick={() => setRunning(p.row as unknown as ReportDefinition)}
           >
             <Play fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            aria-label={t.editReport}
+            title={t.editReport}
+            sx={{
+              color: 'var(--primary)',
+              '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)' },
+            }}
+            onClick={() => onBuild(p.row.id as string)}
+          >
+            <Pencil fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
@@ -197,6 +204,10 @@ export function ReportsView({ onViewInstance }: Props) {
             <RefreshCw className="w-4 h-4 ml-2" />
             {t.refresh}
           </Button>
+          <Button size="sm" onClick={() => onBuild()}>
+            <Plus className="w-4 h-4 ml-2" />
+            {t.createReport}
+          </Button>
         </div>
       </div>
 
@@ -211,6 +222,10 @@ export function ReportsView({ onViewInstance }: Props) {
               <p className="font-medium text-foreground">{t.noReports}</p>
               <p className="text-sm text-muted-foreground">{t.reportBuilderHint}</p>
             </div>
+            <Button size="sm" variant="outline" onClick={() => onBuild()}>
+              <Plus className="w-4 h-4 ml-2" />
+              {t.createReport}
+            </Button>
           </CardContent>
         </Card>
       ) : (

@@ -3,10 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { processesApi, formsApi } from '../api';
-import { positionsApi } from '@/features/organizations';
-import { usersApi } from '@/features/users';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { processesApi } from '../api';
+import {
+  useProcessForms,
+  useInvalidateProcesses,
+  formsKeys,
+} from '../hooks';
+import { useInvalidateDashboard } from '@/features/dashboard';
+import { usePositions } from '@/features/organizations';
+import { useUsers } from '@/features/users';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -125,23 +131,15 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     starterIds: [] as string[],
   });
 
-  // Shared reference data via TanStack Query — deduped with the admin views
+  // Shared reference data via the slice hooks — deduped with the admin views
   // and cached across designer sessions; forms are per-process and only
   // queried once the process row exists (disabled in "new" mode).
   const queryClient = useQueryClient();
-  const { data: positions = [] } = useQuery({
-    queryKey: ['positions'],
-    queryFn: () => positionsApi.findAll(),
-  });
-  const { data: users = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => usersApi.findAll(),
-  });
-  const { data: forms = [] } = useQuery({
-    queryKey: ['forms', currentProcessId],
-    queryFn: () => formsApi.findAll(currentProcessId as string),
-    enabled: !!currentProcessId,
-  });
+  const invalidateProcesses = useInvalidateProcesses();
+  const invalidateDashboard = useInvalidateDashboard();
+  const { positions = [] } = usePositions();
+  const { users = [] } = useUsers();
+  const { forms = [] } = useProcessForms(currentProcessId);
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, any>>({});
   const [processVariables, setProcessVariables] = useState<ProcessVariable[]>([]);
@@ -360,8 +358,8 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateProcesses();
+      invalidateDashboard();
     },
   });
   const saving = saveMutation.isPending;
@@ -392,8 +390,8 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     onSuccess: () => {
       setStatus('ACTIVE');
       toast({ title: 'موفقیت', description: 'فرآیند فعال شد' });
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateProcesses();
+      invalidateDashboard();
     },
   });
 
@@ -623,7 +621,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           onClose={() => setShowFormBuilder(false)}
           onSaved={async () => {
             setShowFormBuilder(false);
-            queryClient.invalidateQueries({ queryKey: ['forms', currentProcessId] });
+            queryClient.invalidateQueries({ queryKey: formsKeys.byProcess(currentProcessId) });
             const variablesData = await processesApi.getVariables(currentProcessId);
             setProcessVariables(variablesData);
           }}

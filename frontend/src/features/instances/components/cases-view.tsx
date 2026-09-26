@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { processInstancesApi } from '../api';
-import { processesApi } from '@/features/processes';
+import { useCases, useTerminateInstance } from '../hooks';
+import { useProcesses } from '@/features/processes';
 import { useAuth } from '@/features/auth';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
@@ -102,7 +101,6 @@ export function CasesView({ onViewInstance }: Props) {
   const [search, setSearch] = useState('');
   const [terminateTarget, setTerminateTarget] = useState<any>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -122,25 +120,23 @@ export function CasesView({ onViewInstance }: Props) {
   // same endpoint. Merges the old instances report and the participated
   // history into one پرونده‌ها view. The processes query feeds the start
   // dialog / filters and is deduped with other views via the shared key.
-  const casesQuery = useQuery({
-    queryKey: ['process-instances', 'cases'],
-    queryFn: () => processInstancesApi.cases(),
-  });
-  const processesQuery = useQuery({
-    queryKey: ['processes'],
-    queryFn: () => processesApi.findAll(),
-  });
-  const instances = casesQuery.data ?? [];
-  const processes = (processesQuery.data ?? []).filter((p) => p.status === 'ACTIVE');
-  const loading = casesQuery.isPending || processesQuery.isPending;
+  const { cases, loading: casesLoading, refetch: refetchCases } = useCases();
+  const {
+    processes: activeProcesses,
+    loading: processesLoading,
+    refetch: refetchProcesses,
+  } = useProcesses();
+  const instances = cases;
+  const processes = useMemo(
+    () => activeProcesses.filter((p) => p.status === 'ACTIVE'),
+    [activeProcesses],
+  );
+  const loading = casesLoading || processesLoading;
 
-  const terminateMutation = useMutation({
-    mutationFn: (id: string) => processInstancesApi.terminate(id),
+  const terminateMutation = useTerminateInstance({
     onSuccess: () => {
       toast({ title: 'موفقیت', description: 'پرونده خاتمه یافت' });
       setTerminateTarget(null);
-      queryClient.invalidateQueries({ queryKey: ['process-instances'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
@@ -301,8 +297,8 @@ export function CasesView({ onViewInstance }: Props) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => {
-            casesQuery.refetch();
-            processesQuery.refetch();
+            refetchCases();
+            refetchProcesses();
           }}>
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی

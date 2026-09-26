@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, EyeOff, History, Loader2, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { processesApi } from '../api';
+import { useProcessVersions, useRestoreProcessVersion } from '../hooks';
 
 /**
  * Immutable version history dialog.
@@ -44,15 +44,8 @@ export function ProcessVersionsDialog({
   const [confirmVer, setConfirmVer] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const queryClient = useQueryClient();
 
-  const versionsQuery = useQuery({
-    queryKey: ['processes', 'versions', processId],
-    queryFn: () => processesApi.getVersions(processId),
-    enabled: open && !!processId,
-  });
-  const versions = versionsQuery.data ?? [];
-  const loading = versionsQuery.isPending;
+  const { versions, loading, refetch: refetchVersions } = useProcessVersions(processId, open);
 
   const togglePreview = async (version: number) => {
     if (previewVer === version) {
@@ -72,21 +65,18 @@ export function ProcessVersionsDialog({
     }
   };
 
-  const restoreMutation = useMutation({
-    mutationFn: (version: number) =>
-      processesApi.restoreVersion(processId, version, note.trim() || undefined),
+  const restoreMutation = useRestoreProcessVersion({
     onSuccess: (proc) => {
       setConfirmVer(null);
       setNote('');
       onRestored(proc);
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      versionsQuery.refetch();
+      refetchVersions(); // prefix invalidation already covers it — belt and braces
     },
     onError: (e: any) => setError(e.message),
   });
 
-  const restore = (version: number) => restoreMutation.mutate(version);
+  const restore = (version: number) =>
+    restoreMutation.mutate({ processId, version, note: note.trim() || undefined });
   const restoring = restoreMutation.isPending;
 
   const fmtDate = (d: string) => new Date(d).toLocaleString('fa-IR');

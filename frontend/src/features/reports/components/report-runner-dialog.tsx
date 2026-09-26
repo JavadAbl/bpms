@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   Ban,
   CheckCircle2,
@@ -16,8 +15,8 @@ import {
 } from 'lucide-react';
 import { IconButton } from '@mui/material';
 import type { GridColDef } from '@mui/x-data-grid';
-import { reportsApi } from '../api';
-import { type ReportDefinition, type ReportExecutionResult } from '../types';
+import { useReportExecution } from '../hooks';
+import { type ReportDefinition } from '../types';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,13 +61,10 @@ export function ReportRunnerDialog({ open, onOpenChange, report, onViewInstance 
 
   // Execute the saved report while the dialog is open (POST-as-read — the
   // result is a live snapshot, so it refetches on every open).
-  const { data: result, isPending: loading, error: runError, refetch: run } = useQuery({
-    queryKey: ['reports', 'execute', report?.id],
-    queryFn: () => reportsApi.execute(report!.id),
-    enabled: open && !!report,
-    staleTime: 0,
-    gcTime: 0,
-  });
+  const { data: result, isPending: loading, error: runError, refetch: run } = useReportExecution(
+    report?.id,
+    open,
+  );
   const error = runError ? (runError instanceof Error ? runError.message : String(runError)) : '';
 
   // Client-side narrowing on top of the server-applied saved filters

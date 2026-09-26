@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { processDraftsApi } from '../api';
+import { useDraftDetail, useSaveDraft, useSubmitDraft, useDeleteDraft } from '../hooks';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -48,13 +47,9 @@ interface Props {
 export function DraftDetailView({ draftId, onBack }: Props) {
   const router = useRouter();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const { data: draft, isPending } = useQuery({
-    queryKey: ['drafts', 'detail', draftId],
-    queryFn: () => processDraftsApi.findOne(draftId),
-  });
+  const { data: draft, isPending } = useDraftDetail(draftId);
   const loading = isPending;
 
   // Zod-backed dynamic form: schema is built from the draft's field
@@ -86,33 +81,20 @@ export function DraftDetailView({ draftId, onBack }: Props) {
     setValues(prefill);
   }, [draft]);
 
-  const saveMutation = useMutation({
-    mutationFn: (data: Record<string, any>) => processDraftsApi.update(draftId, data),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['drafts', 'detail', draftId], updated);
-      toast({ title: 'موفقیت', description: t.draftSaved });
-    },
+  const saveMutation = useSaveDraft(draftId, {
+    onSuccess: () => toast({ title: 'موفقیت', description: t.draftSaved }),
   });
 
-  const submitMutation = useMutation({
-    mutationFn: (data: Record<string, any>) => processDraftsApi.submit(draftId, data),
+  const submitMutation = useSubmitDraft({
     onSuccess: async (inst) => {
       toast({ title: 'موفقیت', description: t.draftSubmitted });
-      // The submission created an instance — every list that shows them must
-      // refresh (they would otherwise serve the 30s-stale cache).
-      queryClient.invalidateQueries({ queryKey: ['drafts'] });
-      queryClient.invalidateQueries({ queryKey: ['process-instances'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       await navigateToInstanceEntry(router, inst);
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => processDraftsApi.remove(draftId),
+  const deleteMutation = useDeleteDraft({
     onSuccess: () => {
       toast({ title: 'موفقیت', description: t.draftDiscarded });
-      queryClient.invalidateQueries({ queryKey: ['drafts'] });
       onBack();
     },
   });
@@ -128,11 +110,11 @@ export function DraftDetailView({ draftId, onBack }: Props) {
     // stays unvalidated on purpose (partial drafts are allowed).
     const parsed = validate();
     if (!parsed) return;
-    submitMutation.mutate(parsed);
+    submitMutation.mutate({ draftId, data: parsed });
   };
 
   const handleDelete = () => {
-    deleteMutation.mutate();
+    deleteMutation.mutate(draftId);
   };
 
   if (loading) {

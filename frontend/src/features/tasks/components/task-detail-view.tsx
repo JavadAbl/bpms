@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { tasksApi } from '../api';
+import { useTaskDetail, useClaimTask, useReleaseTask, useCompleteTask } from '../hooks';
 import { useAuth } from '@/features/auth';
 import { t, statusColors } from '@/lib/i18n';
 import { formatPersianDate, formatPersianDateOnly } from '@/lib/format';
@@ -48,12 +47,8 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   const { user } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: task, isPending, error, refetch } = useQuery({
-    queryKey: ['tasks', 'detail', taskId],
-    queryFn: () => tasksApi.findOne(taskId),
-  });
+  const { data: task, isPending, error, refetch } = useTaskDetail(taskId);
   const loading = isPending;
   // کارتابل privacy: another user's task → access-denied state, not a toast
   // (the global query error handler skips 403s for exactly this reason)
@@ -107,33 +102,19 @@ export function TaskDetailView({ taskId, onBack }: Props) {
     setValues(prefill);
   }, [task]);
 
-  const refreshAfterAction = () => {
-    queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['process-instances'] });
-  };
-
-  const claimMutation = useMutation({
-    mutationFn: () => tasksApi.claim(taskId),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: t.taskClaimed });
-      refreshAfterAction();
-    },
+  // Slice mutation hooks bake in the invalidation matrix (inbox + instances
+  // + dashboard) — the view only supplies its toasts/navigation.
+  const claimMutation = useClaimTask({
+    onSuccess: () => toast({ title: 'موفقیت', description: t.taskClaimed }),
   });
 
-  const releaseMutation = useMutation({
-    mutationFn: () => tasksApi.release(taskId),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: t.taskReleased });
-      refreshAfterAction();
-    },
+  const releaseMutation = useReleaseTask({
+    onSuccess: () => toast({ title: 'موفقیت', description: t.taskReleased }),
   });
 
-  const completeMutation = useMutation({
-    mutationFn: (payload: Record<string, any>) => tasksApi.complete(taskId, payload),
+  const completeMutation = useCompleteTask({
     onSuccess: () => {
       toast({ title: 'موفقیت', description: t.taskCompleted });
-      refreshAfterAction();
       onBack();
     },
   });
@@ -141,8 +122,8 @@ export function TaskDetailView({ taskId, onBack }: Props) {
   const claiming = claimMutation.isPending || releaseMutation.isPending;
   const submitting = completeMutation.isPending;
 
-  const handleClaim = () => claimMutation.mutate();
-  const handleRelease = () => releaseMutation.mutate();
+  const handleClaim = () => claimMutation.mutate(taskId);
+  const handleRelease = () => releaseMutation.mutate(taskId);
 
   const fields: any[] = task?.form?.fields || [];
 
@@ -163,7 +144,7 @@ export function TaskDetailView({ taskId, onBack }: Props) {
       const v = payload[f.name];
       if (v === undefined || v === null || v === '') delete payload[f.name];
     }
-    completeMutation.mutate(payload);
+    completeMutation.mutate({ taskId, data: payload });
   };
 
   if (loading) {

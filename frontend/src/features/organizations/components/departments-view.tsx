@@ -1,11 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { departmentsApi, positionsApi } from '../api';
+import {
+  useDepartments,
+  useDeleteDepartment,
+  useDeletePosition,
+  useRemovePositionUser,
+  useInvalidateOrganizations,
+} from '../hooks';
 import { departmentSchema, positionSchema } from '../schemas';
 import { useZodForm } from '@/hooks/use-zod-form';
-import { usersApi } from '@/features/users';
+import { useUsers } from '@/features/users';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,48 +41,23 @@ export function DepartmentsView() {
   const [showCreatePos, setShowCreatePos] = useState<string | null>(null);
   const [showAssignUser, setShowAssignUser] = useState<string | null>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const departmentsQuery = useQuery({
-    queryKey: ['departments'],
-    queryFn: () => departmentsApi.findAll(),
-  });
-  const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: () => usersApi.findAll(),
-  });
-  const departments = departmentsQuery.data ?? [];
-  const users = usersQuery.data ?? [];
-  const loading = departmentsQuery.isPending || usersQuery.isPending;
+  const { departments, loading: departmentsLoading, refetch: refetchDepartments } = useDepartments();
+  const { users, loading: usersLoading, refetch: refetchUsers } = useUsers();
+  const loading = departmentsLoading || usersLoading;
 
-  const refreshOrg = () => {
-    queryClient.invalidateQueries({ queryKey: ['departments'] });
-    queryClient.invalidateQueries({ queryKey: ['positions'] });
-  };
+  const refreshOrg = useInvalidateOrganizations();
 
-  const deleteDeptMutation = useMutation({
-    mutationFn: (id: string) => departmentsApi.remove(id),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'دپارتمان حذف شد' });
-      refreshOrg();
-    },
+  const deleteDeptMutation = useDeleteDepartment({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'دپارتمان حذف شد' }),
   });
 
-  const deletePosMutation = useMutation({
-    mutationFn: (id: string) => positionsApi.remove(id),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'موقعیت حذف شد' });
-      refreshOrg();
-    },
+  const deletePosMutation = useDeletePosition({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'موقعیت حذف شد' }),
   });
 
-  const removeUserMutation = useMutation({
-    mutationFn: ({ positionId, userId }: { positionId: string; userId: string }) =>
-      positionsApi.removeUser(positionId, userId),
-    onSuccess: () => {
-      toast({ title: 'موفقیت', description: 'کاربر از موقعیت حذف شد' });
-      refreshOrg();
-    },
+  const removeUserMutation = useRemovePositionUser({
+    onSuccess: () => toast({ title: 'موفقیت', description: 'کاربر از موقعیت حذف شد' }),
   });
 
   const toggleExpand = (id: string) => {
@@ -118,8 +99,8 @@ export function DepartmentsView() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => {
-            departmentsQuery.refetch();
-            usersQuery.refetch();
+            refetchDepartments();
+            refetchUsers();
           }}>
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی

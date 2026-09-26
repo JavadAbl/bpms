@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useDashboard } from '../hooks';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import {
@@ -27,7 +27,6 @@ import {
   RefreshCw,
   Workflow,
 } from 'lucide-react';
-import { dashboardApi } from '../api';
 import { type DashboardData } from '../types';
 import { useAuth } from '@/features/auth';
 import { t } from '@/lib/i18n';
@@ -181,10 +180,7 @@ export function DashboardView({
   const isAdmin = user?.role === 'ADMIN';
   const colors = useTokenColors();
 
-  const { data, isPending, error, refetch } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => dashboardApi.get(),
-  });
+  const { data, isPending, error, refetch } = useDashboard();
   const loading = isPending;
   const load = refetch;
 

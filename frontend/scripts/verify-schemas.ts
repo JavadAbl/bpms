@@ -215,6 +215,109 @@ function issues<T>(schema: z.ZodType<T, any>, value: unknown): Record<string, st
   check('dynamic: valid values pass (all keys kept)', ok.success && (ok.data as any)['title'] === 'x');
 }
 
+/* ============ reports: report builder ============ */
+{
+  const {
+    reportBuilderSchema,
+    reportFiltersFromValues,
+    reportPayloadFromValues,
+    reportBuilderValuesFromReport,
+    EMPTY_REPORT_BUILDER,
+  } = await import('../src/features/reports/schemas');
+
+  // blank form → every hard requirement flagged with the historical messages
+  let e = issues(reportBuilderSchema, EMPTY_REPORT_BUILDER);
+  check('report: blank name rejected', e.name === 'نام گزارش الزامی است');
+  check('report: missing process rejected', e.processId === 'انتخاب فرآیند الزامی است');
+  check('report: zero columns rejected', e.columns === 'حداقل یک ستون انتخاب کنید');
+
+  const valid = {
+    ...EMPTY_REPORT_BUILDER,
+    name: '  گزارش مرخصی‌ها  ',
+    processId: 'p1',
+    columns: [
+      { key: 'field:status', source: 'INSTANCE', fieldKey: 'status' },
+      { key: 'var:leaveType', source: 'VARIABLE', fieldKey: 'leaveType' },
+    ],
+    statuses: ['COMPLETED', 'RUNNING'],
+    dateFrom: '2026-01-01',
+    dateTo: '2026-12-31',
+    varFilters: [
+      { uid: 1, name: 'leaveType', op: 'eq', value: 'Annual' },
+      { uid: 2, name: '', op: 'eq', value: '' }, // untouched row stays valid…
+    ],
+  };
+  const ok = reportBuilderSchema.safeParse(valid);
+  check('report: valid config passes + name trimmed', ok.success && ok.data!.name === 'گزارش مرخصی‌ها');
+  check(
+    'report: payload drops untouched rows and empty description',
+    ok.success &&
+      reportPayloadFromValues(ok.data!).filters.filter((f) => f.type === 'VARIABLE').length === 1 &&
+      reportPayloadFromValues(ok.data!).description === undefined,
+  );
+  check(
+    'report: filters built in STATUS/DATE_RANGE/VARIABLE order',
+    ok.success &&
+      reportFiltersFromValues(ok.data!)
+        .map((f) => f.type)
+        .join(',') === 'STATUS,DATE_RANGE,VARIABLE',
+  );
+
+  // half-filled variable row (value typed, no variable) → per-row error path
+  e = issues(reportBuilderSchema, {
+    ...valid,
+    varFilters: [{ uid: 3, name: '  ', op: 'contains', value: 'x' }],
+  });
+  check('report: half-filled variable row flagged', e['varFilters.0.name'] === 'متغیر الزامی است');
+
+  // inverted date range → error on dateTo (new guard; old builder returned 0 rows silently)
+  e = issues(reportBuilderSchema, { ...valid, dateFrom: '2026-12-31', dateTo: '2026-01-01' });
+  check('report: inverted date range rejected', e.dateTo === 'تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد');
+
+  // round-trip: saved filters → editable values → same wire filters
+  const nextUid = (() => {
+    let n = 0;
+    return () => ++n;
+  })();
+  const parsed = reportBuilderValuesFromReport(
+    {
+      id: 'r1',
+      name: 'گزارش تست',
+      description: null,
+      processId: 'p1',
+      process: undefined,
+      columns: [{ key: 'field:status', source: 'INSTANCE', fieldKey: 'status' }],
+      filters: [
+        { type: 'STATUS', statuses: ['FAILED'] },
+        { type: 'DATE_RANGE', from: '2026-03-01T00:00:00.000Z', to: '2026-03-31' },
+        { type: 'VARIABLE', name: 'amount', op: 'gt', value: '5' }, // unknown op → 'eq'
+        { type: 'VARIABLE', name: 'city', value: 'Tehran' },        // missing op → 'eq'
+      ],
+      columnCount: 1,
+      filterCount: 4,
+      createdBy: undefined,
+      createdAt: '',
+      updatedAt: '',
+    } as any,
+    nextUid,
+  );
+  check(
+    'report: round-trip statuses + ISO date sliced to day',
+    parsed.statuses.length === 1 && parsed.statuses[0] === 'FAILED' &&
+      parsed.dateFrom === '2026-03-01' && parsed.dateTo === '2026-03-31',
+  );
+  check(
+    'report: unknown/missing filter op coerced to eq',
+    parsed.varFilters.length === 2 && parsed.varFilters.every((r) => r.op === 'eq'),
+  );
+  check(
+    'report: round-trip wire filters identical',
+    reportFiltersFromValues(parsed)
+      .map((f) => `${f.type}:${f.statuses?.join('/') ?? f.name ?? f.from ?? ''}:${f.op ?? ''}`)
+      .join('|') === 'STATUS:FAILED:|DATE_RANGE:2026-03-01:|VARIABLE:amount:eq|VARIABLE:city:eq',
+  );
+}
+
 /* ============ summary ============ */
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

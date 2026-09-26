@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { processDraftsApi } from '../api';
+import { useDrafts, useDeleteDraft } from '../hooks';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -33,21 +32,13 @@ export function DraftsView({ onViewDraft }: Props) {
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data, isPending, refetch } = useQuery({
-    queryKey: ['drafts'],
-    queryFn: () => processDraftsApi.findAll(),
-  });
-  const drafts = data ?? [];
-  const loading = isPending;
+  const { drafts, loading, refetch } = useDrafts();
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => processDraftsApi.remove(id),
+  const deleteMutation = useDeleteDraft({
     onSuccess: () => {
       toast({ title: 'موفقیت', description: t.draftDiscarded });
       setDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ['drafts'] });
     },
   });
 

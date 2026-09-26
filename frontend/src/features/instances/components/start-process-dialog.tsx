@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { processesApi } from '@/features/processes';
-import { processDraftsApi } from '../api';
+import { useProcesses } from '@/features/processes';
+import { useCreateDraft } from '../hooks';
 import { tasksApi } from '@/features/tasks';
 import { t } from '@/lib/i18n';
 import { useAuth } from '@/features/auth';
@@ -63,7 +62,6 @@ export async function navigateToInstanceEntry(
 export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Props) {
   const { toast } = useToast();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { user } = useAuth();
   const {
     values: selection,
@@ -74,17 +72,13 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
   } = useZodForm(startProcessSchema, { processId: '' });
 
   // Startable (ACTIVE + permitted) processes — fetched while the dialog is
-  // open via the shared ['processes'] query (deduped with the other views).
+  // open via the shared processes query (deduped with the other views).
   // A process with a starter list may only be started by its starters (admins
   // bypass); an empty list means everyone may start.
-  const { data } = useQuery({
-    queryKey: ['processes'],
-    queryFn: () => processesApi.findAll(),
-    enabled: open,
-  });
+  const { processes: allProcesses } = useProcesses({ enabled: open });
   const processes = useMemo(
     () =>
-      (data || [])
+      allProcesses
         .filter((p: any) => p.status === 'ACTIVE')
         .filter((p: any) => {
           const starters: string[] = (p.starters || []).map((s: any) => s.userId);
@@ -92,7 +86,7 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
           if (user?.role === 'ADMIN') return true;
           return !!user?.userId && starters.includes(user.userId);
         }),
-    [data, user],
+    [allProcesses, user],
   );
 
   useEffect(() => {
@@ -104,12 +98,10 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
     );
   }, [open, initialProcessId, processes]);
 
-  const startMutation = useMutation({
-    mutationFn: (processId: string) => processDraftsApi.create(processId),
+  const startMutation = useCreateDraft({
     onSuccess: (draft) => {
       toast({ title: 'موفقیت', description: 'پیش‌نویس ایجاد شد — فرم را تکمیل کنید' });
       onOpenChange(false);
-      queryClient.invalidateQueries({ queryKey: ['drafts'] });
       router.push(`/drafts/${draft.id}`);
     },
   });
