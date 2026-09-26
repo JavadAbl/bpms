@@ -1,14 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
-  Pencil,
   Play,
-  Plus,
   RefreshCw,
   Trash2,
 } from 'lucide-react';
@@ -48,13 +45,11 @@ interface Props {
 }
 
 /**
- * گزارش‌ساز (v7) — admin report builder landing page.
- * Lists the saved report definitions; «ایجاد گزارش» / edit navigate to the
- * full-page builder at /admin/reports/build, and each row runs / deletes.
+ * گزارش‌ساز (v7) — admin report landing page.
+ * Lists the saved report definitions; each row runs / deletes.
  * ADMIN-only route (guarded by the /admin layout).
  */
 export function ReportsView({ onViewInstance }: Props) {
-  const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -164,14 +159,6 @@ export function ReportsView({ onViewInstance }: Props) {
           </IconButton>
           <IconButton
             size="small"
-            aria-label={t.editReport}
-            title={t.editReport}
-            onClick={() => router.push(`/admin/reports/build?id=${p.row.id as string}`)}
-          >
-            <Pencil fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
             aria-label={t.deleteReport}
             title={t.deleteReport}
             sx={{
@@ -212,13 +199,6 @@ export function ReportsView({ onViewInstance }: Props) {
             <RefreshCw className="w-4 h-4 ml-2" />
             {t.refresh}
           </Button>
-          <Button
-            size="sm"
-            onClick={() => router.push('/admin/reports/build')}
-          >
-            <Plus className="w-4 h-4 ml-2" />
-            {t.createReport}
-          </Button>
         </div>
       </div>
 
@@ -233,14 +213,6 @@ export function ReportsView({ onViewInstance }: Props) {
               <p className="font-medium text-foreground">{t.noReports}</p>
               <p className="text-sm text-muted-foreground">{t.reportBuilderHint}</p>
             </div>
-            <Button
-              size="sm"
-              onClick={() => router.push('/admin/reports/build')}
-              className="gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              {t.createReport}
-            </Button>
           </CardContent>
         </Card>
       ) : (
