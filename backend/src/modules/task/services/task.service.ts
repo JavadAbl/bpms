@@ -151,16 +151,33 @@ export class TaskService {
     });
     const positionIds = userPositions.items.map((up) => up.positionId);
 
+    // Keep the inbox search scoped to task name, description, and the related
+    // process name. Build the assignment filter separately so it does not
+    // overwrite the search OR clause.
     const predicate = buildFindManyArgs(query, { searchableFields: ['name', 'description'] });
+    if (query.search) {
+      const searchWhere = predicate.where as Record<string, any>;
+      searchWhere.OR = [
+        ...(searchWhere.OR ?? []),
+        { processInstance: { process: { name: { contains: query.search } } } },
+      ];
+      predicate.where = searchWhere as typeof predicate.where;
+    }
     predicate.orderBy = predicate.orderBy ?? { createdAt: 'asc' };
     predicate.where = {
       ...predicate.where,
       status: 'PENDING',
-      OR: [
-        // Directly assigned to me (includes position tasks I've claimed)
-        { assigneeId: userId },
-        // Position-based and NOT yet claimed by anyone
-        ...(positionIds.length > 0 ? [{ positionId: { in: positionIds }, assigneeId: null }] : []),
+      AND: [
+        {
+          OR: [
+            // Directly assigned to me (includes position tasks I've claimed)
+            { assigneeId: userId },
+            // Position-based and NOT yet claimed by anyone
+            ...(positionIds.length > 0
+              ? [{ positionId: { in: positionIds }, assigneeId: null }]
+              : []),
+          ],
+        },
       ],
     } as typeof predicate.where;
 

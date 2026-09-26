@@ -175,7 +175,7 @@ const CSS = `
     box-sizing: border-box;
   }
   #${IDS.modal} {
-    width: 380px;
+    width: 480px;
     max-width: calc(100vw - 32px);
     background: #ffffff;
     border-radius: 12px;
@@ -641,7 +641,7 @@ const CSS = `
     font-family: "Iran Sans Web", Tahoma, "Segoe UI", FreeSerif, Arial, sans-serif;
   }
   #${IDS.taskDialog} {
-    width: 560px;
+    width: 680px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 48px);
     display: flex;
@@ -1039,7 +1039,7 @@ const CSS = `
     font-family: "Iran Sans Web", Tahoma, "Segoe UI", FreeSerif, Arial, sans-serif;
   }
   #${IDS.startDialog} {
-    width: 480px;
+    width: 600px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 48px);
     display: flex;
@@ -1122,7 +1122,7 @@ const CSS = `
   }
   #${IDS.draftOverlay}.oa-pa-hidden { display: none !important; }
   #${IDS.draftDialog} {
-    width: 560px;
+    width: 680px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 48px);
     display: flex;
