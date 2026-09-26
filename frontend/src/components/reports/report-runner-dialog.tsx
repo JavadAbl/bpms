@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Ban,
   CheckCircle2,
@@ -59,36 +60,19 @@ interface Props {
  */
 export function ReportRunnerDialog({ open, onOpenChange, report, onViewInstance }: Props) {
   const { toast } = useToast();
-  const [result, setResult] = useState<ReportExecutionResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
 
-  const run = useCallback(async () => {
-    if (!report) return;
-    setLoading(true);
-    setError('');
-    try {
-      const data = await reportsApi.execute(report.id);
-      setResult(data);
-    } catch (e: any) {
-      setError(e.message);
-      setResult(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [report]);
-
-  useEffect(() => {
-    if (open) {
-      setStatusFilter('all');
-      setSearch('');
-      setResult(null);
-      setError('');
-      run();
-    }
-  }, [open, run]);
+  // Execute the saved report while the dialog is open (POST-as-read — the
+  // result is a live snapshot, so it refetches on every open).
+  const { data: result, isPending: loading, error: runError, refetch: run } = useQuery({
+    queryKey: ['reports', 'execute', report?.id],
+    queryFn: () => reportsApi.execute(report!.id),
+    enabled: open && !!report,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const error = runError ? (runError instanceof Error ? runError.message : String(runError)) : '';
 
   // Client-side narrowing on top of the server-applied saved filters
   const filteredRows = useMemo(() => {
@@ -247,7 +231,7 @@ export function ReportRunnerDialog({ open, onOpenChange, report, onViewInstance 
                     <SelectItem value="TERMINATED">{t.TERMINATED}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="sm" onClick={run} className="gap-1.5">
+                <Button variant="outline" size="sm" onClick={() => run()} className="gap-1.5">
                   <RefreshCw className="w-4 h-4" />
                   {t.refresh}
                 </Button>

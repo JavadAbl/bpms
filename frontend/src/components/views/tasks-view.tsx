@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
@@ -49,40 +50,30 @@ const statusChipSx: Record<string, Record<string, unknown>> = {
 };
 
 export function TasksView({ onViewTask }: Props) {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await tasksApi.mine();
-      setTasks(data);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // کارتابل = received (pending) tasks only — /tasks/mine is the inbox.
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['tasks', 'mine'],
+    queryFn: () => tasksApi.mine(),
+  });
+  const tasks = data ?? [];
+  const loading = isPending;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleClaim = async (taskId: string) => {
-    setActionLoading(taskId);
-    try {
-      await tasksApi.claim(taskId);
+  const claimMutation = useMutation({
+    mutationFn: (taskId: string) => tasksApi.claim(taskId),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: 'وظیفه ادعا شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['process-instances'] });
+    },
+  });
+  const actionLoading = claimMutation.isPending ? claimMutation.variables : null;
+
+  const handleClaim = (taskId: string) => claimMutation.mutate(taskId);
 
   // کارتابل = received tasks only. The backend (/tasks/mine) already returns
   // PENDING tasks exclusively — completed/passed tasks are not part of the
@@ -238,7 +229,7 @@ export function TasksView({ onViewTask }: Props) {
           <h2 className="text-2xl font-bold">{t.myTasks}</h2>
           <Badge variant="secondary">{tasks.length.toLocaleString('fa-IR')} در انتظار اقدام</Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={load}>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
           <RefreshCw className="w-4 h-4 ml-2" />
           بروزرسانی
         </Button>

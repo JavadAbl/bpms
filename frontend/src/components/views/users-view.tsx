@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
 import { t, roleLabel } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -43,39 +44,31 @@ const roleChipSx: Record<string, Record<string, unknown>> = {
 };
 
 export function UsersView() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [editUser, setEditUser] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await usersApi.findAll();
-      setUsers(data);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.findAll(),
+  });
+  const users = data ?? [];
+  const loading = isPending;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('آیا از حذف این کاربر مطمئن هستید؟')) return;
-    try {
-      await usersApi.remove(id);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => usersApi.remove(id),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: 'کاربر حذف شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
+  const handleDelete = (id: string) => {
+    if (!confirm('آیا از حذف این کاربر مطمئن هستید؟')) return;
+    deleteMutation.mutate(id);
   };
 
   const filteredUsers = useMemo(() => {
@@ -191,7 +184,7 @@ export function UsersView() {
           <h2 className="text-2xl font-bold">{t.users}</h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>
@@ -246,7 +239,7 @@ export function UsersView() {
           onSaved={() => {
             setShowCreate(false);
             setEditUser(null);
-            load();
+            queryClient.invalidateQueries({ queryKey: ['users'] });
           }}
         />
       )}

@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
   Pencil,
@@ -33,7 +35,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { DataTable } from '@/components/common/data-table';
 import { useToast } from '@/hooks/use-toast';
-import { ReportRunnerDialog } from '@/components/reports/report-runner-dialog';
+
+// The runner (MUI grid + execute flow) is a lazy chunk, mounted only while a
+// report is actually being run — the reports landing page stays light.
+const ReportRunnerDialog = dynamic(
+  () => import('@/components/reports/report-runner-dialog').then((m) => m.ReportRunnerDialog),
+  { ssr: false },
+);
 
 interface Props {
   onViewInstance: (id: string) => void;
@@ -48,42 +56,32 @@ interface Props {
 export function ReportsView({ onViewInstance }: Props) {
   const router = useRouter();
   const { toast } = useToast();
-  const [reports, setReports] = useState<ReportDefinition[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['reports'],
+    queryFn: () => reportsApi.findAll(),
+  });
+  const reports = data ?? [];
+  const loading = isPending;
 
   const [running, setRunning] = useState<ReportDefinition | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReportDefinition | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setReports(await reportsApi.findAll());
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await reportsApi.remove(deleteTarget.id);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => reportsApi.remove(id),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: t.reportDeleted });
       setDeleteTarget(null);
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id);
   };
+  const deleting = deleteMutation.isPending;
 
   const columns: GridColDef[] = [
     {
@@ -210,7 +208,7 @@ export function ReportsView({ onViewInstance }: Props) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 ml-2" />
             {t.refresh}
           </Button>
@@ -255,15 +253,17 @@ export function ReportsView({ onViewInstance }: Props) {
         />
       )}
 
-      {/* Runner (execute + CSV export) */}
-      <ReportRunnerDialog
-        open={!!running}
-        onOpenChange={(open) => {
-          if (!open) setRunning(null);
-        }}
-        report={running}
-        onViewInstance={onViewInstance}
-      />
+      {/* Runner (execute + CSV export) — mounted only while a report runs */}
+      {running && (
+        <ReportRunnerDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setRunning(null);
+          }}
+          report={running}
+          onViewInstance={onViewInstance}
+        />
+      )}
 
       {/* Delete confirm */}
       <AlertDialog

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { processInstancesApi, filesApi, InstanceAttachment } from '@/lib/api';
 import { t, statusColors } from '@/lib/i18n';
 import { formatPersianDate, formatPersianDateOnly } from '@/lib/format';
@@ -35,32 +36,16 @@ interface Props {
 }
 
 export function InstanceDetailView({ instanceId, onBack }: Props) {
-  const [instance, setInstance] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setDenied(false);
-      try {
-        const data = await processInstancesApi.findOne(instanceId);
-        setInstance(data);
-      } catch (err: any) {
-        // کارتابل privacy: instances the user does not participate in → denied state
-        if (err?.status === 403) {
-          setDenied(true);
-        } else {
-          toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instanceId]);
+  const { data: instance, isPending, error } = useQuery({
+    queryKey: ['process-instances', 'detail', instanceId],
+    queryFn: () => processInstancesApi.findOne(instanceId),
+  });
+  const loading = isPending;
+  // کارتابل privacy: instances the user does not participate in → denied state
+  // (the global query error handler skips 403s for exactly this reason)
+  const denied = (error as any)?.status === 403;
 
   if (loading) {
     return (
@@ -247,23 +232,12 @@ function TimelineIcon({ status }: { status: string }) {
  */
 function AttachmentsPanel({ instanceId }: { instanceId: string }) {
   const { toast } = useToast();
-  const [files, setFiles] = useState<InstanceAttachment[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoadError(false);
-    try {
-      const data = await filesApi.byInstance(instanceId);
-      setFiles(data);
-    } catch {
-      setLoadError(true);
-    }
-  }, [instanceId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data: files, error: loadError, refetch } = useQuery({
+    queryKey: ['files', 'by-instance', instanceId],
+    queryFn: () => filesApi.byInstance(instanceId),
+  });
 
   const download = async (f: InstanceAttachment) => {
     setDownloadingId(f.id);
@@ -305,7 +279,7 @@ function AttachmentsPanel({ instanceId }: { instanceId: string }) {
         <p className="text-xs text-muted-foreground mt-1">{t.attachmentsHint}</p>
       </CardHeader>
       <CardContent>
-        {files === null && !loadError ? (
+        {files === undefined && !loadError ? (
           <div className="space-y-2">
             {[0, 1].map((i) => (
               <Skeleton key={i} className="h-12 w-full rounded-xl md-skeleton" />
@@ -316,7 +290,7 @@ function AttachmentsPanel({ instanceId }: { instanceId: string }) {
             <p className="text-sm text-muted-foreground mb-2">
               دریافت پیوست‌ها ناموفق بود
             </p>
-            <Button variant="outline" size="sm" onClick={load}>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
               <Loader2 className="w-4 h-4 ml-2" />
               {t.refresh}
             </Button>

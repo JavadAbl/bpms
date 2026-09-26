@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processDraftsApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
@@ -45,54 +46,68 @@ interface Props {
 
 export function DraftDetailView({ draftId, onBack }: Props) {
   const router = useRouter();
-  const [draft, setDraft] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState<Record<string, any>>({});
-  const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const data = await processDraftsApi.findOne(draftId);
-      setDraft(data);
-      const fields: FormField[] = data.form?.fields || [];
-      const prefill: Record<string, any> = { ...(data.formData || {}) };
-      for (const f of fields) {
-        if (prefill[f.name] === undefined && f.defaultValue !== undefined) {
-          prefill[f.name] = (f as any).defaultValue;
-        }
-      }
-      setFormData(prefill);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: draft, isPending } = useQuery({
+    queryKey: ['drafts', 'detail', draftId],
+    queryFn: () => processDraftsApi.findOne(draftId),
+  });
+  const loading = isPending;
 
+  // Seed the editable form from the saved draft data (+ field defaults)
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftId]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updated = await processDraftsApi.update(draftId, formData);
-      setDraft(updated);
-      toast({ title: 'موفقیت', description: t.draftSaved });
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    if (!draft) return;
+    const fields: FormField[] = draft.form?.fields || [];
+    const prefill: Record<string, any> = { ...(draft.formData || {}) };
+    for (const f of fields) {
+      if (prefill[f.name] === undefined && f.defaultValue !== undefined) {
+        prefill[f.name] = (f as any).defaultValue;
+      }
     }
-  };
+    setFormData(prefill);
+  }, [draft]);
 
-  const handleSubmit = async () => {
+  const saveMutation = useMutation({
+    mutationFn: (data: Record<string, any>) => processDraftsApi.update(draftId, data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['drafts', 'detail', draftId], updated);
+      toast({ title: 'موفقیت', description: t.draftSaved });
+    },
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: (data: Record<string, any>) => processDraftsApi.submit(draftId, data),
+    onSuccess: async (inst) => {
+      toast({ title: 'موفقیت', description: t.draftSubmitted });
+      // The submission created an instance — every list that shows them must
+      // refresh (they would otherwise serve the 30s-stale cache).
+      queryClient.invalidateQueries({ queryKey: ['drafts'] });
+      queryClient.invalidateQueries({ queryKey: ['process-instances'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      await navigateToInstanceEntry(router, inst);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => processDraftsApi.remove(draftId),
+    onSuccess: () => {
+      toast({ title: 'موفقیت', description: t.draftDiscarded });
+      queryClient.invalidateQueries({ queryKey: ['drafts'] });
+      onBack();
+    },
+  });
+
+  const saving = saveMutation.isPending;
+  const submitting = submitMutation.isPending;
+  const deleting = deleteMutation.isPending;
+
+  const handleSave = () => saveMutation.mutate(formData);
+
+  const handleSubmit = () => {
     const fields: FormField[] = draft?.form?.fields || [];
     const errors = validateDynamicForm(fields, formData);
     if (Object.keys(errors).length > 0) {
@@ -105,30 +120,11 @@ export function DraftDetailView({ draftId, onBack }: Props) {
       });
       return;
     }
-    setSubmitting(true);
-    try {
-      const inst = await processDraftsApi.submit(draftId, formData);
-      toast({ title: 'موفقیت', description: t.draftSubmitted });
-      await navigateToInstanceEntry(router, inst);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setSubmitting(false);
-    }
+    submitMutation.mutate(formData);
   };
 
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      await processDraftsApi.remove(draftId);
-      toast({ title: 'موفقیت', description: t.draftDiscarded });
-      onBack();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-      setConfirmDelete(false);
-    }
+  const handleDelete = () => {
+    deleteMutation.mutate();
   };
 
   if (loading) {

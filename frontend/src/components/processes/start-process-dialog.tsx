@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processesApi, processDraftsApi, tasksApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
@@ -56,59 +57,57 @@ export async function navigateToInstanceEntry(
  * opens the draft form. The real instance starts only when the user submits.
  */
 export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Props) {
-  const [processes, setProcesses] = useState<any[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<string>('');
-  const [starting, setStarting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Load startable (ACTIVE + permitted) processes each time the dialog opens.
+  // Startable (ACTIVE + permitted) processes — fetched while the dialog is
+  // open via the shared ['processes'] query (deduped with the other views).
   // A process with a starter list may only be started by its starters (admins
   // bypass); an empty list means everyone may start.
+  const { data } = useQuery({
+    queryKey: ['processes'],
+    queryFn: () => processesApi.findAll(),
+    enabled: open,
+  });
+  const processes = useMemo(
+    () =>
+      (data || [])
+        .filter((p: any) => p.status === 'ACTIVE')
+        .filter((p: any) => {
+          const starters: string[] = (p.starters || []).map((s: any) => s.userId);
+          if (starters.length === 0) return true; // unrestricted
+          if (user?.role === 'ADMIN') return true;
+          return !!user?.userId && starters.includes(user.userId);
+        }),
+    [data, user],
+  );
+
   useEffect(() => {
     if (!open) return;
-    let alive = true;
-    processesApi
-      .findAll()
-      .then((data) => {
-        if (!alive) return;
-        const active = (data || [])
-          .filter((p: any) => p.status === 'ACTIVE')
-          .filter((p: any) => {
-            const starters: string[] = (p.starters || []).map((s: any) => s.userId);
-            if (starters.length === 0) return true; // unrestricted
-            if (user?.role === 'ADMIN') return true;
-            return !!user?.userId && starters.includes(user.userId);
-          });
-        setProcesses(active);
-        setSelectedProcess(
-          initialProcessId && active.some((p: any) => p.id === initialProcessId)
-            ? initialProcessId
-            : ''
-        );
-      })
-      .catch((err: any) => {
-        toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-      });
-    return () => {
-      alive = false;
-    };
-  }, [open, initialProcessId, user, toast]);
+    setSelectedProcess(
+      initialProcessId && processes.some((p: any) => p.id === initialProcessId)
+        ? initialProcessId
+        : '',
+    );
+  }, [open, initialProcessId, processes]);
 
-  const handleStart = async () => {
-    if (!selectedProcess) return;
-    setStarting(true);
-    try {
-      const draft = await processDraftsApi.create(selectedProcess);
+  const startMutation = useMutation({
+    mutationFn: (processId: string) => processDraftsApi.create(processId),
+    onSuccess: (draft) => {
       toast({ title: 'موفقیت', description: 'پیش‌نویس ایجاد شد — فرم را تکمیل کنید' });
       onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ['drafts'] });
       router.push(`/drafts/${draft.id}`);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setStarting(false);
-    }
+    },
+  });
+  const starting = startMutation.isPending;
+
+  const handleStart = () => {
+    if (!selectedProcess) return;
+    startMutation.mutate(selectedProcess);
   };
 
   return (

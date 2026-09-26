@@ -1,79 +1,44 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { categoriesApi, type Category } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
-// Module-level cache — categories are global and change rarely, so every
-// consumer (form builders, runtime selects, previews) shares one fetch.
+// Categories are global and change rarely — every consumer (form builders,
+// runtime selects, previews) shares ONE cached query instead of the old
+// hand-rolled module-level cache. Mutations invalidate the key below and
+// every mounted consumer refreshes automatically.
 // ---------------------------------------------------------------------------
 
-let cache: Category[] | null = null;
-let inflight: Promise<Category[]> | null = null;
-const listeners = new Set<(cats: Category[]) => void>();
-
-function publish(cats: Category[]) {
-  cache = cats;
-  listeners.forEach((fn) => fn(cats));
-}
-
-export function invalidateCategories() {
-  cache = null;
-  inflight = null;
-  // Re-fetch in background so subscribed components refresh
-  loadCategories().catch(() => undefined);
-}
-
-export function loadCategories(force = false): Promise<Category[]> {
-  if (!force && cache) return Promise.resolve(cache);
-  if (!inflight) {
-    inflight = categoriesApi
-      .findAll()
-      .then((cats) => {
-        publish(cats);
-        return cats;
-      })
-      .finally(() => {
-        inflight = null;
-      });
-  }
-  return inflight;
-}
+/** Shared query key — invalidate this after any category mutation. */
+export const CATEGORIES_QUERY_KEY = ['categories'] as const;
 
 /**
  * Fetches (and caches) all global categories. Returns the list plus a
- * `reload` that forces a fresh fetch (call after CRUD operations).
+ * `loading` flag and a `reload` that forces a fresh fetch.
  */
 export function useCategories() {
-  const [categories, setCategories] = useState<Category[]>(cache ?? []);
-  const [loading, setLoading] = useState(cache === null);
+  const query = useQuery({
+    queryKey: CATEGORIES_QUERY_KEY,
+    queryFn: () => categoriesApi.findAll(),
+    staleTime: 5 * 60_000, // semi-static reference data
+  });
+  return {
+    categories: query.data ?? [],
+    loading: query.isPending,
+    reload: query.refetch,
+  };
+}
 
-  useEffect(() => {
-    const listener = (cats: Category[]) => {
-      setCategories(cats);
-      setLoading(false);
-    };
-    listeners.add(listener);
-    let cancelled = false;
-    loadCategories()
-      .then((cats) => {
-        if (!cancelled) listener(cats);
-      })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-      listeners.delete(listener);
-    };
-  }, []);
-
-  const reload = useCallback(async () => {
-    const cats = await loadCategories(true);
-    return cats;
-  }, []);
-
-  return { categories, loading, reload };
+/**
+ * Invalidate the shared categories cache — call after CRUD operations so
+ * form builders and runtime selects everywhere pick up the change.
+ */
+export function useInvalidateCategories() {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
+  };
 }
 
 /** Resolve one category by id from the shared cache. */

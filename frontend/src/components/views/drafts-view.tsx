@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processDraftsApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
@@ -29,43 +30,32 @@ interface Props {
 }
 
 export function DraftsView({ onViewDraft }: Props) {
-  const [drafts, setDrafts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await processDraftsApi.findAll();
-      setDrafts(data);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['drafts'],
+    queryFn: () => processDraftsApi.findAll(),
+  });
+  const drafts = data ?? [];
+  const loading = isPending;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    setDeleting(true);
-    try {
-      await processDraftsApi.remove(deleteId);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => processDraftsApi.remove(id),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: t.draftDiscarded });
       setDeleteId(null);
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['drafts'] });
+    },
+  });
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deleteMutation.mutate(deleteId);
   };
+  const deleting = deleteMutation.isPending;
 
   const filtered = useMemo(() => {
     if (!search.trim()) return drafts;
@@ -156,7 +146,7 @@ export function DraftsView({ onViewDraft }: Props) {
             <p className="text-xs text-muted-foreground">{t.draftFormHint}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={load}>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
           <RefreshCw className="w-4 h-4 ml-2" />
           {t.refresh || 'بروزرسانی'}
         </Button>

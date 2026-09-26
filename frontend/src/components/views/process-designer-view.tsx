@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processesApi, formsApi, positionsApi, usersApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,15 +19,37 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { validateConditionXml } from '@/lib/condition-validation';
-import { BpmnDesigner, DEFAULT_BPMN_XML } from '@/components/bpmn/bpmn-designer';
-import { FormBuilderPanel } from '@/components/forms/form-builder-panel';
-import { TaskAssignmentModal } from '@/components/processes/task-assignment-modal';
-import { ProcessStartersModal } from '@/components/processes/process-starters-modal';
-import { ProcessVersionsDialog } from '@/components/processes/process-versions-dialog';
-import {
-  GatewayConditionModal,
-  type ConditionVariable,
-} from '@/components/processes/gateway-condition-modal';
+import { DEFAULT_BPMN_XML } from '@/components/bpmn/default-bpmn-xml';
+import type { ConditionVariable } from '@/components/processes/gateway-condition-modal';
+
+// Heavy designer pieces are lazy chunks — bpmn-js, the form builder and the
+// modals are by far the largest code in the app and only this route needs
+// them. The modals below are rendered only while open, so their chunks load
+// on first use instead of bloating the design route's main bundle.
+const BpmnDesigner = dynamic(
+  () => import('@/components/bpmn/bpmn-designer').then((m) => m.BpmnDesigner),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full rounded-none" /> },
+);
+const FormBuilderPanel = dynamic(
+  () => import('@/components/forms/form-builder-panel').then((m) => m.FormBuilderPanel),
+  { ssr: false },
+);
+const TaskAssignmentModal = dynamic(
+  () => import('@/components/processes/task-assignment-modal').then((m) => m.TaskAssignmentModal),
+  { ssr: false },
+);
+const ProcessStartersModal = dynamic(
+  () => import('@/components/processes/process-starters-modal').then((m) => m.ProcessStartersModal),
+  { ssr: false },
+);
+const ProcessVersionsDialog = dynamic(
+  () => import('@/components/processes/process-versions-dialog').then((m) => m.ProcessVersionsDialog),
+  { ssr: false },
+);
+const GatewayConditionModal = dynamic(
+  () => import('@/components/processes/gateway-condition-modal').then((m) => m.GatewayConditionModal),
+  { ssr: false },
+);
 import { useCategories } from '@/hooks/use-categories';
 import {
   ArrowRight,
@@ -73,7 +97,6 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   // ONLY when the user presses ذخیره inside the designer (v4 requirement).
   const isNewMode = !currentProcessId;
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [bpmnXml, setBpmnXml] = useState('');
@@ -83,9 +106,23 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   // Bump to force-remount the modeler with fresh XML (e.g. after a version restore)
   const [designerNonce, setDesignerNonce] = useState(0);
 
-  const [forms, setForms] = useState<any[]>([]);
-  const [positions, setPositions] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  // Shared reference data via TanStack Query — deduped with the admin views
+  // and cached across designer sessions; forms are per-process and only
+  // queried once the process row exists (disabled in "new" mode).
+  const queryClient = useQueryClient();
+  const { data: positions = [] } = useQuery({
+    queryKey: ['positions'],
+    queryFn: () => positionsApi.findAll(),
+  });
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.findAll(),
+  });
+  const { data: forms = [] } = useQuery({
+    queryKey: ['forms', currentProcessId],
+    queryFn: () => formsApi.findAll(currentProcessId as string),
+    enabled: !!currentProcessId,
+  });
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, any>>({});
   const [processVariables, setProcessVariables] = useState<ProcessVariable[]>([]);
@@ -110,24 +147,20 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
   }, []);
 
   const loadProcessData = useCallback(async (pid: string) => {
-    const [proc, formsData, positionsData, usersData, userTasksData, existingAssignments, variablesData] =
-      await Promise.all([
-        processesApi.findOne(pid),
-        formsApi.findAll(pid),
-        positionsApi.findAll(),
-        usersApi.findAll(),
-        processesApi.getUserTasks(pid),
-        processesApi.getAssignments(pid),
-        processesApi.getVariables(pid),
-      ]);
+    // positions / users / forms arrive via the shared queries above; only the
+    // process-specific data is loaded imperatively here (it seeds LOCAL editor
+    // state the user then mutates — a query would clobber unsaved edits).
+    const [proc, userTasksData, existingAssignments, variablesData] = await Promise.all([
+      processesApi.findOne(pid),
+      processesApi.getUserTasks(pid),
+      processesApi.getAssignments(pid),
+      processesApi.getVariables(pid),
+    ]);
     setName(proc.name);
     setDescription(proc.description || '');
     setBpmnXml(proc.bpmnXml);
     setStatus(proc.status);
     setProcessVersion(proc.version || 1);
-    setForms(formsData);
-    setPositions(positionsData);
-    setUsers(usersData);
     setUserTasks(userTasksData);
     setProcessVariables(variablesData);
     // Process starters — empty list means every user may start
@@ -165,14 +198,8 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           setProcessVersion(1);
           setStarterIds([]);
           setStartersRestricted(false);
-          const [positionsData, usersData] = await Promise.all([
-            positionsApi.findAll(),
-            usersApi.findAll(),
-          ]);
-          if (cancelled) return;
-          setPositions(positionsData);
-          setUsers(usersData);
-          setForms([]);
+          // positions / users / forms arrive via the shared queries (forms stay
+          // empty until the process row exists)
           setProcessVariables([]);
           setAssignments({});
         }
@@ -238,25 +265,12 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
     setUserTasks(tasks);
   }, []);
 
-  const handleSave = async () => {
-    if (!name || !bpmnXml) {
-      toast({ title: 'خطا', description: 'نام و طراحی فرآیند الزامی است', variant: 'destructive' });
-      return;
-    }
-    // Save-time gate: reject XML whose gateway conditions the engine would
-    // mis-evaluate (same rules as the backend — defense in depth)
-    const conditionIssues = validateConditionXml(bpmnXml);
-    if (conditionIssues.length > 0) {
-      toast({
-        title: 'ذخیره انجام نشد — شرط نامعتبر',
-        description: conditionIssues.map((i) => i.message).join('؛ '),
-        variant: 'destructive',
-        duration: 10000,
-      });
-      return;
-    }
-    setSaving(true);
-    try {
+  // Save flow — one mutation covering both branches ("new" creates the row,
+  // edit PATCHes it); invalidations refresh the process list + dashboard.
+  // Validation stays in the sync handleSave wrapper so the mutation only
+  // fires on valid input.
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       if (!currentProcessId) {
         // ---- "new" mode: THIS is the only place a process row gets created ----
         const finalStarterIds = startersRestricted ? starterIds : [];
@@ -266,7 +280,6 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
             description: 'اگر شروع فرآیند محدود است، حداقل یک کاربر را انتخاب کنید',
             variant: 'destructive',
           });
-          setSaving(false);
           return;
         }
         const created = await processesApi.create({
@@ -328,14 +341,45 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
 
         toast({ title: 'موفقیت', description: 'فرآیند ذخیره شد' });
       }
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+  const saving = saveMutation.isPending;
+
+  const handleSave = () => {
+    if (!name || !bpmnXml) {
+      toast({ title: 'خطا', description: 'نام و طراحی فرآیند الزامی است', variant: 'destructive' });
+      return;
     }
+    // Save-time gate: reject XML whose gateway conditions the engine would
+    // mis-evaluate (same rules as the backend — defense in depth)
+    const conditionIssues = validateConditionXml(bpmnXml);
+    if (conditionIssues.length > 0) {
+      toast({
+        title: 'ذخیره انجام نشد — شرط نامعتبر',
+        description: conditionIssues.map((i) => i.message).join('؛ '),
+        variant: 'destructive',
+        duration: 10000,
+      });
+      return;
+    }
+    saveMutation.mutate();
   };
 
-  const handleActivate = async () => {
+  const activateMutation = useMutation({
+    mutationFn: () => processesApi.update(currentProcessId as string, { status: 'ACTIVE' }),
+    onSuccess: () => {
+      setStatus('ACTIVE');
+      toast({ title: 'موفقیت', description: 'فرآیند فعال شد' });
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const handleActivate = () => {
     if (!currentProcessId) return;
     // Same gate as save: activation with broken conditions would hang/misroute instances
     const conditionIssues = bpmnXml ? validateConditionXml(bpmnXml) : [];
@@ -348,13 +392,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
       });
       return;
     }
-    try {
-      await processesApi.update(currentProcessId, { status: 'ACTIVE' });
-      setStatus('ACTIVE');
-      toast({ title: 'موفقیت', description: 'فرآیند فعال شد' });
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
+    activateMutation.mutate();
   };
 
   const updateAssignment = (taskName: string, field: string, value: any) => {
@@ -550,11 +588,8 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
           onClose={() => setShowFormBuilder(false)}
           onSaved={async () => {
             setShowFormBuilder(false);
-            const [formsData, variablesData] = await Promise.all([
-              formsApi.findAll(currentProcessId),
-              processesApi.getVariables(currentProcessId),
-            ]);
-            setForms(formsData);
+            queryClient.invalidateQueries({ queryKey: ['forms', currentProcessId] });
+            const variablesData = await processesApi.getVariables(currentProcessId);
             setProcessVariables(variablesData);
           }}
         />
@@ -598,7 +633,7 @@ export function ProcessDesignerView({ processId: initialProcessId, onBack }: Pro
         />
       )}
 
-      {currentProcessId && (
+      {currentProcessId && versionsOpen && (
         <ProcessVersionsDialog
           open={versionsOpen}
           processId={currentProcessId}

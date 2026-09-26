@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { t, statusColors } from '@/lib/i18n';
@@ -45,91 +46,90 @@ interface Props {
 export function TaskDetailView({ taskId, onBack }: Props) {
   const { user } = useAuth();
   const router = useRouter();
-  const [task, setTask] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState(false);
-  const [formData, setFormData] = useState<Record<string, any>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [claiming, setClaiming] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState<Record<string, any>>({});
 
-  const load = async () => {
-    setLoading(true);
-    setDenied(false);
-    try {
-      const data = await tasksApi.findOne(taskId);
-      setTask(data);
-      // Pre-fill the form:
-      //  1. Data filled in PREVIOUS tasks of this instance (process variables)
-      //  2. Field default values
-      //  3. This task's own latest submission (draft recovery) — highest priority
-      const fields: any[] = data.form?.fields || [];
-      const vars: Record<string, any> = data.instanceVariables || {};
-      const prefill: Record<string, any> = {};
-      for (const f of fields) {
-        const varName = f.variable || f.name;
-        const fromInstance = vars[varName] ?? vars[f.name];
-        if (fromInstance !== undefined && fromInstance !== null && fromInstance !== '') {
-          prefill[f.name] = fromInstance;
-        } else if (
-          f.defaultValue !== undefined &&
-          f.defaultValue !== null &&
-          f.defaultValue !== ''
-        ) {
-          prefill[f.name] = f.defaultValue;
-        }
-      }
-      if (data.submissions && data.submissions.length > 0) {
-        const latest = data.submissions[data.submissions.length - 1];
-        try {
-          Object.assign(prefill, JSON.parse(latest.data));
-        } catch {}
-      }
-      setFormData(prefill);
-    } catch (err: any) {
-      // کارتابل privacy: another user's task → access-denied state, not a toast
-      if (err?.status === 403) {
-        setDenied(true);
-      } else {
-        toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: task, isPending, error, refetch } = useQuery({
+    queryKey: ['tasks', 'detail', taskId],
+    queryFn: () => tasksApi.findOne(taskId),
+  });
+  const loading = isPending;
+  // کارتابل privacy: another user's task → access-denied state, not a toast
+  // (the global query error handler skips 403s for exactly this reason)
+  const denied = (error as any)?.status === 403;
 
+  // Pre-fill the form whenever fresh task data arrives:
+  //  1. Data filled in PREVIOUS tasks of this instance (process variables)
+  //  2. Field default values
+  //  3. This task's own latest submission (draft recovery) — highest priority
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId]);
+    if (!task) return;
+    const fields: any[] = task.form?.fields || [];
+    const vars: Record<string, any> = task.instanceVariables || {};
+    const prefill: Record<string, any> = {};
+    for (const f of fields) {
+      const varName = f.variable || f.name;
+      const fromInstance = vars[varName] ?? vars[f.name];
+      if (fromInstance !== undefined && fromInstance !== null && fromInstance !== '') {
+        prefill[f.name] = fromInstance;
+      } else if (
+        f.defaultValue !== undefined &&
+        f.defaultValue !== null &&
+        f.defaultValue !== ''
+      ) {
+        prefill[f.name] = f.defaultValue;
+      }
+    }
+    if (task.submissions && task.submissions.length > 0) {
+      const latest = task.submissions[task.submissions.length - 1];
+      try {
+        Object.assign(prefill, JSON.parse(latest.data));
+      } catch {}
+    }
+    setFormData(prefill);
+  }, [task]);
 
-  const handleClaim = async () => {
-    setClaiming(true);
-    try {
-      await tasksApi.claim(taskId);
+  const refreshAfterAction = () => {
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['process-instances'] });
+  };
+
+  const claimMutation = useMutation({
+    mutationFn: () => tasksApi.claim(taskId),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: t.taskClaimed });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setClaiming(false);
-    }
-  };
+      refreshAfterAction();
+    },
+  });
 
-  const handleRelease = async () => {
-    setClaiming(true);
-    try {
-      await tasksApi.release(taskId);
+  const releaseMutation = useMutation({
+    mutationFn: () => tasksApi.release(taskId),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: t.taskReleased });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setClaiming(false);
-    }
-  };
+      refreshAfterAction();
+    },
+  });
 
-  const handleComplete = async () => {
+  const completeMutation = useMutation({
+    mutationFn: (payload: Record<string, any>) => tasksApi.complete(taskId, payload),
+    onSuccess: () => {
+      toast({ title: 'موفقیت', description: t.taskCompleted });
+      refreshAfterAction();
+      onBack();
+    },
+  });
+
+  const claiming = claimMutation.isPending || releaseMutation.isPending;
+  const submitting = completeMutation.isPending;
+
+  const handleClaim = () => claimMutation.mutate();
+  const handleRelease = () => releaseMutation.mutate();
+
+  const fields: any[] = task?.form?.fields || [];
+
+  const handleComplete = () => {
     // Client-side validation: required editable fields must be filled.
     // Read-only fields are excluded (they display previous tasks' data and
     // cannot be edited — see validateDynamicForm).
@@ -144,26 +144,17 @@ export function TaskDetailView({ taskId, onBack }: Props) {
       });
       return;
     }
-    setSubmitting(true);
-    try {
-      // Read-only fields are display-only mirrors of process variables:
-      // keep them when they carry a value (re-saving the same variable is
-      // harmless), but never submit an EMPTY read-only field — that would
-      // overwrite a real variable with an empty value.
-      const payload: Record<string, any> = { ...formData };
-      for (const f of fields) {
-        if (!f.readOnly) continue;
-        const v = payload[f.name];
-        if (v === undefined || v === null || v === '') delete payload[f.name];
-      }
-      await tasksApi.complete(taskId, payload);
-      toast({ title: 'موفقیت', description: t.taskCompleted });
-      onBack();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setSubmitting(false);
+    // Read-only fields are display-only mirrors of process variables:
+    // keep them when they carry a value (re-saving the same variable is
+    // harmless), but never submit an EMPTY read-only field — that would
+    // overwrite a real variable with an empty value.
+    const payload: Record<string, any> = { ...formData };
+    for (const f of fields) {
+      if (!f.readOnly) continue;
+      const v = payload[f.name];
+      if (v === undefined || v === null || v === '') delete payload[f.name];
     }
+    completeMutation.mutate(payload);
   };
 
   if (loading) {
@@ -223,7 +214,6 @@ export function TaskDetailView({ taskId, onBack }: Props) {
       (!task.selfService && !!positionId && !assigneeId) ||
       (!assigneeId && !positionId));
 
-  const fields = task.form?.fields || [];
   const instanceId: string | undefined =
     task.processInstanceId ?? task.processInstance?.id;
   const hasSubmissions = task.submissions && task.submissions.length > 0;

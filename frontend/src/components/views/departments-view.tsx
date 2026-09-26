@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { departmentsApi, positionsApi, usersApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -26,31 +27,54 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Briefcase, Plus, RefreshCw, Trash2, ChevronDown, ChevronLeft, User, UserPlus, X } from 'lucide-react';
 
 export function DepartmentsView() {
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showCreateDept, setShowCreateDept] = useState(false);
   const [showCreatePos, setShowCreatePos] = useState<string | null>(null);
   const [showAssignUser, setShowAssignUser] = useState<string | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [depts, usrs] = await Promise.all([departmentsApi.findAll(), usersApi.findAll()]);
-      setDepartments(depts);
-      setUsers(usrs);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const departmentsQuery = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsApi.findAll(),
+  });
+  const usersQuery = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.findAll(),
+  });
+  const departments = departmentsQuery.data ?? [];
+  const users = usersQuery.data ?? [];
+  const loading = departmentsQuery.isPending || usersQuery.isPending;
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refreshOrg = () => {
+    queryClient.invalidateQueries({ queryKey: ['departments'] });
+    queryClient.invalidateQueries({ queryKey: ['positions'] });
+  };
+
+  const deleteDeptMutation = useMutation({
+    mutationFn: (id: string) => departmentsApi.remove(id),
+    onSuccess: () => {
+      toast({ title: 'موفقیت', description: 'دپارتمان حذف شد' });
+      refreshOrg();
+    },
+  });
+
+  const deletePosMutation = useMutation({
+    mutationFn: (id: string) => positionsApi.remove(id),
+    onSuccess: () => {
+      toast({ title: 'موفقیت', description: 'موقعیت حذف شد' });
+      refreshOrg();
+    },
+  });
+
+  const removeUserMutation = useMutation({
+    mutationFn: ({ positionId, userId }: { positionId: string; userId: string }) =>
+      positionsApi.removeUser(positionId, userId),
+    onSuccess: () => {
+      toast({ title: 'موفقیت', description: 'کاربر از موقعیت حذف شد' });
+      refreshOrg();
+    },
+  });
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expanded);
@@ -59,36 +83,18 @@ export function DepartmentsView() {
     setExpanded(newExpanded);
   };
 
-  const handleDeleteDept = async (id: string) => {
+  const handleDeleteDept = (id: string) => {
     if (!confirm('آیا از حذف این دپارتمان مطمئن هستید؟')) return;
-    try {
-      await departmentsApi.remove(id);
-      toast({ title: 'موفقیت', description: 'دپارتمان حذف شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
+    deleteDeptMutation.mutate(id);
   };
 
-  const handleDeletePos = async (id: string) => {
+  const handleDeletePos = (id: string) => {
     if (!confirm('آیا از حذف این موقعیت مطمئن هستید؟')) return;
-    try {
-      await positionsApi.remove(id);
-      toast({ title: 'موفقیت', description: 'موقعیت حذف شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
+    deletePosMutation.mutate(id);
   };
 
-  const handleRemoveUser = async (positionId: string, userId: string) => {
-    try {
-      await positionsApi.removeUser(positionId, userId);
-      toast({ title: 'موفقیت', description: 'کاربر از موقعیت حذف شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
+  const handleRemoveUser = (positionId: string, userId: string) => {
+    removeUserMutation.mutate({ positionId, userId });
   };
 
   if (loading) {
@@ -108,7 +114,10 @@ export function DepartmentsView() {
           <h2 className="text-2xl font-bold">{t.departments}</h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load}>
+          <Button variant="outline" size="sm" onClick={() => {
+            departmentsQuery.refetch();
+            usersQuery.refetch();
+          }}>
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>
@@ -222,7 +231,7 @@ export function DepartmentsView() {
           onClose={() => setShowCreateDept(false)}
           onCreated={() => {
             setShowCreateDept(false);
-            load();
+            refreshOrg();
           }}
         />
       )}
@@ -233,7 +242,7 @@ export function DepartmentsView() {
           onClose={() => setShowCreatePos(null)}
           onCreated={() => {
             setShowCreatePos(null);
-            load();
+            refreshOrg();
           }}
         />
       )}
@@ -245,7 +254,7 @@ export function DepartmentsView() {
           onClose={() => setShowAssignUser(null)}
           onAssigned={() => {
             setShowAssignUser(null);
-            load();
+            refreshOrg();
           }}
         />
       )}

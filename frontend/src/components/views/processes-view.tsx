@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processesApi } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -42,11 +43,17 @@ const statusChipSx: Record<string, Record<string, unknown>> = {
 };
 
 export function ProcessesView({ onOpenDesigner }: Props) {
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['processes'],
+    queryFn: () => processesApi.findAll(),
+  });
+  const processes = data ?? [];
+  const loading = isPending;
 
   // ---- read-only preview dialog state ----
   const [previewProcess, setPreviewProcess] = useState<{ id: string; name: string } | null>(null);
@@ -68,42 +75,30 @@ export function ProcessesView({ onOpenDesigner }: Props) {
     }
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await processesApi.findAll();
-      setProcesses(data);
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('آیا از حذف این فرآیند مطمئن هستید؟')) return;
-    try {
-      await processesApi.remove(id);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => processesApi.remove(id),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: 'فرآیند حذف شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: (id: string) => processesApi.update(id, { status: 'ACTIVE' }),
+    onSuccess: () => {
+      toast({ title: 'موفقیت', description: 'فرآیند فعال شد' });
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const handleDelete = (id: string) => {
+    if (!confirm('آیا از حذف این فرآیند مطمئن هستید؟')) return;
+    deleteMutation.mutate(id);
   };
 
-  const handleActivate = async (id: string) => {
-    try {
-      await processesApi.update(id, { status: 'ACTIVE' });
-      toast({ title: 'موفقیت', description: 'فرآیند فعال شد' });
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    }
-  };
+  const handleActivate = (id: string) => activateMutation.mutate(id);
 
   const filtered = useMemo(() => {
     return processes.filter((proc) => {
@@ -262,7 +257,7 @@ export function ProcessesView({ onOpenDesigner }: Props) {
           <h2 className="text-2xl font-bold">{t.processes}</h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>

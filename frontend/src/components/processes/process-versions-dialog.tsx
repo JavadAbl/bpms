@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, EyeOff, History, Loader2, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,39 +38,21 @@ export function ProcessVersionsDialog({
   onClose,
   onRestored,
 }: Props) {
-  const [versions, setVersions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [previewVer, setPreviewVer] = useState<number | null>(null);
   const [previewXml, setPreviewXml] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [confirmVer, setConfirmVer] = useState<number | null>(null);
   const [note, setNote] = useState('');
-  const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState('');
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    if (!processId) return;
-    setLoading(true);
-    try {
-      setVersions(await processesApi.getVersions(processId));
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [processId]);
-
-  useEffect(() => {
-    if (open) {
-      setVersions([]);
-      setPreviewVer(null);
-      setPreviewXml('');
-      setConfirmVer(null);
-      setNote('');
-      setError('');
-      load();
-    }
-  }, [open, load]);
+  const versionsQuery = useQuery({
+    queryKey: ['processes', 'versions', processId],
+    queryFn: () => processesApi.getVersions(processId),
+    enabled: open && !!processId,
+  });
+  const versions = versionsQuery.data ?? [];
+  const loading = versionsQuery.isPending;
 
   const togglePreview = async (version: number) => {
     if (previewVer === version) {
@@ -89,21 +72,22 @@ export function ProcessVersionsDialog({
     }
   };
 
-  const restore = async (version: number) => {
-    setRestoring(true);
-    setError('');
-    try {
-      const proc = await processesApi.restoreVersion(processId, version, note.trim() || undefined);
+  const restoreMutation = useMutation({
+    mutationFn: (version: number) =>
+      processesApi.restoreVersion(processId, version, note.trim() || undefined),
+    onSuccess: (proc) => {
       setConfirmVer(null);
       setNote('');
       onRestored(proc);
-      await load();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setRestoring(false);
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      versionsQuery.refetch();
+    },
+    onError: (e: any) => setError(e.message),
+  });
+
+  const restore = (version: number) => restoreMutation.mutate(version);
+  const restoring = restoreMutation.isPending;
 
   const fmtDate = (d: string) => new Date(d).toLocaleString('fa-IR');
 

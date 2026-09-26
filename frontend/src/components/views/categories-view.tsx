@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { categoriesApi, type Category } from '@/lib/api';
-import { invalidateCategories, useCategories } from '@/hooks/use-categories';
+import { useCategories, useInvalidateCategories } from '@/hooks/use-categories';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,6 +39,7 @@ const KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 
 export function CategoriesView() {
   const { categories, loading, reload } = useCategories();
+  const invalidateCategories = useInvalidateCategories();
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [search, setSearch] = useState('');
@@ -148,8 +149,7 @@ export function CategoriesView() {
       } else {
         await categoriesApi.create(payload);
       }
-      await reload();
-      invalidateCategories(); // refresh form builders / runtime selects
+      invalidateCategories(); // refresh this list + every form builder / runtime select
       toast({ title: t.success, description: t.categorySaved });
       setShowDialog(false);
     } catch (err: any) {
@@ -166,7 +166,6 @@ export function CategoriesView() {
     if (!confirm(`${t.confirmDeleteCategory}${usageNote}`)) return;
     try {
       await categoriesApi.remove(category.id);
-      await reload();
       invalidateCategories();
       toast({ title: t.success, description: t.categoryDeleted });
     } catch (err: any) {

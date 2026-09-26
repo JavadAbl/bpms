@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { processInstancesApi, processesApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { t } from '@/lib/i18n';
@@ -93,17 +94,14 @@ function StatusChip({ status }: { status: string }) {
 export function CasesView({ onViewInstance }: Props) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-  const [instances, setInstances] = useState<any[]>([]);
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showStart, setShowStart] = useState(false);
   const [startProcessId, setStartProcessId] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [processFilter, setProcessFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [terminateTarget, setTerminateTarget] = useState<any>(null);
-  const [terminating, setTerminating] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -118,44 +116,38 @@ export function CasesView({ onViewInstance }: Props) {
     // one-shot deep link — intentionally ignores dep changes
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Single user-facing case list: every case the user participates in
-      // (started by them / has any task in it) — admins get ALL cases from
-      // the same endpoint. Merges the old instances report and the
-      // participated history into one پرونده‌ها view.
-      const [insts, procs] = await Promise.all([
-        processInstancesApi.cases(),
-        processesApi.findAll(),
-      ]);
-      setInstances(insts);
-      setProcesses(procs.filter((p) => p.status === 'ACTIVE'));
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // Single user-facing case list: every case the user participates in
+  // (started by them / has any task in it) — admins get ALL cases from the
+  // same endpoint. Merges the old instances report and the participated
+  // history into one پرونده‌ها view. The processes query feeds the start
+  // dialog / filters and is deduped with other views via the shared key.
+  const casesQuery = useQuery({
+    queryKey: ['process-instances', 'cases'],
+    queryFn: () => processInstancesApi.cases(),
+  });
+  const processesQuery = useQuery({
+    queryKey: ['processes'],
+    queryFn: () => processesApi.findAll(),
+  });
+  const instances = casesQuery.data ?? [];
+  const processes = (processesQuery.data ?? []).filter((p) => p.status === 'ACTIVE');
+  const loading = casesQuery.isPending || processesQuery.isPending;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleTerminate = async () => {
-    if (!terminateTarget) return;
-    setTerminating(true);
-    try {
-      await processInstancesApi.terminate(terminateTarget.id);
+  const terminateMutation = useMutation({
+    mutationFn: (id: string) => processInstancesApi.terminate(id),
+    onSuccess: () => {
       toast({ title: 'موفقیت', description: 'پرونده خاتمه یافت' });
       setTerminateTarget(null);
-      await load();
-    } catch (err: any) {
-      toast({ title: 'خطا', description: err.message, variant: 'destructive' });
-    } finally {
-      setTerminating(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['process-instances'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const handleTerminate = () => {
+    if (!terminateTarget) return;
+    terminateMutation.mutate(terminateTarget.id);
   };
+  const terminating = terminateMutation.isPending;
 
   // KPI summary (admin report overview; for non-admins it reflects their own scope)
   const kpis = useMemo(
@@ -307,7 +299,10 @@ export function CasesView({ onViewInstance }: Props) {
           )}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load}>
+          <Button variant="outline" size="sm" onClick={() => {
+            casesQuery.refetch();
+            processesQuery.refetch();
+          }}>
             <RefreshCw className="w-4 h-4 ml-2" />
             بروزرسانی
           </Button>

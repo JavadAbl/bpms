@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import {
@@ -179,26 +180,12 @@ export function DashboardView({
   const isAdmin = user?.role === 'ADMIN';
   const colors = useTokenColors();
 
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const d = await dashboardApi.get();
-      setData(d);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data, isPending, error, refetch } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: () => dashboardApi.get(),
+  });
+  const loading = isPending;
+  const load = refetch;
 
   const completed7dTotal =
     data?.completedLast7Days?.reduce((sum, d) => sum + d.count, 0) ?? 0;
@@ -237,7 +224,7 @@ export function DashboardView({
             variant="ghost"
             size="icon"
             className="shrink-0 rounded-full"
-            onClick={load}
+            onClick={() => load()}
             disabled={loading}
             aria-label={t.refresh}
             title={t.refresh}
@@ -615,7 +602,7 @@ export function DashboardView({
         <Card className="border-destructive/40">
           <CardContent className="p-4 flex items-center gap-3">
             <EmptyState title={t.dashboardLoadError} />
-            <Button variant="secondary" size="sm" onClick={load} className="shrink-0">
+            <Button variant="secondary" size="sm" onClick={() => load()} className="shrink-0">
               <RefreshCw className="w-4 h-4" />
               {t.refresh}
             </Button>
