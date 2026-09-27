@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { getToken, setToken } from '@/lib/api/client';
 import { authApi } from './api';
 import { usersApi } from '@/features/users';
-import type { AuthUser } from './types';
+import { asRole, type AuthUser } from './types';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -61,7 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: payload.sub,
         username: payload.username,
         email: payload.email,
-        role: payload.role,
+        // Untrusted JWT payload — normalize unknown roles to USER.
+        role: asRole(payload.role),
       };
     } catch {
       setToken(null);
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             username: fresh.username,
             email: fresh.email,
             name: fresh.name,
-            role: fresh.role,
+            role: asRole(fresh.role),
           };
           persistUserInfo(next);
           setUser(next);
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: res.username,
       email: res.email,
       name: res.name,
-      role: res.role,
+      role: asRole(res.role),
     };
     persistUserInfo(u);
     setUser(u);

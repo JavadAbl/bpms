@@ -1,8 +1,10 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../auth-provider';
-import type { AuthUser } from '../types';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { Role } from '../types';
 
 /**
  * Role-based authorization primitives for the UI.
@@ -12,9 +14,6 @@ import type { AuthUser } from '../types';
  * the app flowing through these helpers so widening access later is a
  * one-line change (e.g. roles={['ADMIN', 'AUDITOR']}).
  */
-
-/** Role of a signed-in user. String today; a union can replace it later. */
-export type Role = AuthUser['role'];
 
 /**
  * Logic-level role check — the single source of truth for "can this user
@@ -74,5 +73,35 @@ export function RoleGate({
   if (!user || !roles.includes(user.role)) {
     return <>{fallback ?? <NoAccessPanel message={message} />}</>;
   }
+  return <>{children}</>;
+}
+
+/**
+ * Wraps public-only pages (e.g. /login): already-authenticated visitors are
+ * redirected to `redirect` (dashboard by default) instead of seeing the auth
+ * form again. Shows the app-wide splash while the session check runs.
+ */
+export function PublicOnly({
+  children,
+  redirect = '/dashboard',
+}: {
+  children: ReactNode;
+  redirect?: string;
+}) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) router.replace(redirect);
+  }, [loading, user, router, redirect]);
+
+  if (loading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Skeleton className="h-12 w-12 rounded-full" />
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }

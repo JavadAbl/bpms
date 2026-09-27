@@ -1,31 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/features/auth';
+import { PublicOnly } from '@/features/auth';
 import { LoginView } from '@/features/auth/components/login-view';
-import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * Public login route. Already-authenticated visitors are bounced to the
- * dashboard; a successful login updates the global auth context which
- * triggers the same redirect.
+ * Public login route. PublicOnly bounces already-authenticated visitors to
+ * the dashboard; the login form itself lives in the auth slice.
  */
 export default function LoginPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && user) router.replace('/dashboard');
-  }, [loading, user, router]);
-
-  if (loading || user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Skeleton className="h-12 w-12 rounded-full" />
-      </div>
-    );
-  }
-
-  return <LoginView />;
+  return (
+    <PublicOnly>
+      <LoginView />
+    </PublicOnly>
+  );
 }

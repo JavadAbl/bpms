@@ -1,7 +1,12 @@
 import { z } from 'zod';
+import { ROLES } from '@/features/auth/types';
 
-/** Roles as understood by the user dialog (mirrors backend enum). */
-export const USER_ROLES = ['ADMIN', 'SENIOR_EXPERT', 'USER'] as const;
+/**
+ * Roles for the user dialog — alias of the canonical auth ROLES.
+ * (Deep import: importing the auth barrel here would cycle, since
+ * auth-provider already imports the users slice.)
+ */
+export const USER_ROLES = ROLES;
 
 /** Shared shape of the create/edit user form. */
 export const userFormSchema = z.object({
@@ -14,7 +19,7 @@ export const userFormSchema = z.object({
     .pipe(z.email('ایمیل نامعتبر است')),
   /** Sent only when set — required on create, optional on edit. */
   password: z.string(),
-  role: z.enum(USER_ROLES),
+  role: z.enum(ROLES),
 });
 
 /** Creating a user requires a password. */
