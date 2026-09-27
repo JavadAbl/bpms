@@ -6,7 +6,7 @@ import { useProcesses } from '@/features/processes';
 import { useCreateDraft } from '../hooks';
 import { tasksApi } from '@/features/tasks';
 import { t } from '@/lib/i18n';
-import { useAuth } from '@/features/auth';
+import { useAuth, useCan } from '@/features/auth';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -63,6 +63,7 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
+  const isAdmin = useCan(['ADMIN']);
   const {
     values: selection,
     setValue,
@@ -83,10 +84,10 @@ export function StartProcessDialog({ open, onOpenChange, initialProcessId }: Pro
         .filter((p: any) => {
           const starters: string[] = (p.starters || []).map((s: any) => s.userId);
           if (starters.length === 0) return true; // unrestricted
-          if (user?.role === 'ADMIN') return true;
+          if (isAdmin) return true;
           return !!user?.userId && starters.includes(user.userId);
         }),
-    [allProcesses, user],
+    [allProcesses, user, isAdmin],
   );
 
   useEffect(() => {

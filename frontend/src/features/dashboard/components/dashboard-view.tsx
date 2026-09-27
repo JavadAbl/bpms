@@ -28,7 +28,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import { type DashboardData } from '../types';
-import { useAuth } from '@/features/auth';
+import { useAuth, useCan } from '@/features/auth';
 import { t } from '@/lib/i18n';
 import { formatPersianDate, formatPersianDateOnly } from '@/lib/format';
 import { Card, CardContent } from '@/components/ui/card';
@@ -177,7 +177,7 @@ export function DashboardView({
   onViewInstance: (id: string) => void;
 }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = useCan(['ADMIN']);
   const colors = useTokenColors();
 
   const { data, isPending, error, refetch } = useDashboard();

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCases, useTerminateInstance } from '../hooks';
 import { useProcesses } from '@/features/processes';
-import { useAuth } from '@/features/auth';
+import { useAuth, useCan } from '@/features/auth';
 import { t } from '@/lib/i18n';
 import { formatPersianDateOnly } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -93,7 +93,7 @@ function StatusChip({ status }: { status: string }) {
 
 export function CasesView({ onViewInstance }: Props) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = useCan(['ADMIN']);
   const [showStart, setShowStart] = useState(false);
   const [startProcessId, setStartProcessId] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string>('all');

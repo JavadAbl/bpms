@@ -4,7 +4,7 @@ import { useEffect, useState, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/features/auth';
+import { useAuth, useCan } from '@/features/auth';
 import { t, statusColors, roleLabel } from '@/lib/i18n';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = useCan(['ADMIN']);
   const navItems = useNavItems(isAdmin);
 
   // Restore persisted rail state

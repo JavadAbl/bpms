@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { useAuth } from '@/features/auth';
+import { useAuth, useCan } from '@/features/auth';
 import { t } from '@/lib/i18n';
 import { tasksApi } from '@/features/tasks';
 import { processesApi } from '@/features/processes';
@@ -50,7 +50,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const [pendingTasks, setPendingTasks] = useState<any[]>([]);
   const [activeProcesses, setActiveProcesses] = useState<any[]>([]);
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = useCan(['ADMIN']);
 
   // Note: the Ctrl/Cmd+K hotkey lives in AppShell (single owner) to avoid
   // double-toggle when both handlers would fire on the same event.
